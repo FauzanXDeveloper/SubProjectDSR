@@ -1,0 +1,421 @@
+================================================================================
+ARBM FINANCING & DSR CALCULATOR - CALCULATION REFERENCE
+================================================================================
+Every formula the system uses, in one place. Each block cites the engine file
+that owns it and, where known, the source cell in the master Excel workbooks:
+  PF  = "CCRIS DSR EVALUATION REPORT 2025 23122025.xlsm"
+  HF  = "Home Financing Manual DSR.xlsm"
+  CC  = credit_card spec
+  V10 = "Financing Calculator V10" (HF pricing quotations)
+
+Conventions used below:
+  - RM values are monthly unless stated.
+  - Rates are per-annum fractions (0.135 = 13.5% p.a.) unless "%".
+  - num(x) = parse a field, stripping commas / spaces / "%"; blank -> 0.
+  - MAX/MIN/AVERAGEIF match the Excel functions of the same name.
+  - "AVERAGEIF(>0)" = average of the non-zero values only.
+
+Reasons a figure is 0 / "-": a required input is blank, or a rule floors it to 0.
+
+NOTE (admin): every policy number below is now a CONFIGURABLE default. The
+values live in js/engine/config.js and can be changed - per browser - through
+admin.html (saved as overrides, export/import JSON, reset restores the Excel
+defaults). The figures quoted in this document are those Excel defaults.
+
+================================================================================
+1. AGE FROM IC                                          [js/engine/age.js]
+================================================================================
+Input: 12-digit Malaysian IC (YYMMDD-PB-###G).
+  yy       = first 2 digits of IC
+  curYY    = current year mod 100
+  fullYear = (yy > curYY) ? 1900+yy : 2000+yy
+  AGE      = currentYear - fullYear         (year-only difference; birthday
+                                             within the year is ignored)
+  If AGE > 100  -> AGE = currentYear - (1900+yy)
+  If AGE < 0 or IC not parseable -> null
+
+Display format: dddddd-dd-dddd (e.g. 970502025230 -> 970502-02-5230).
+
+================================================================================
+2. RECOGNISED INCOME                                    [js/engine/income.js]
+================================================================================
+Three input modes: NORMAL manual payslip, EPF/KWSP statement, BIZMAN.
+Every product reads GROSS and NET from here.
+
+--------------------------------------------------------------------------------
+2.1 NORMAL - manual payslip (6 months x 8 components)    [calcNormalManual]
+--------------------------------------------------------------------------------
+Components per month: basic, fixedAllowance, other, commission, ot, epf,
+                      pcb, socso.
+
+  Basic (recognised)     = MAX of the 6 monthly basics            (Excel C87)
+  Fixed Allowance        = AVERAGEIF(>0) of the 6 months          (D87)
+  Other Income           = MAX of the 6 monthly "other"           (F87)
+  Commission total       = sum of 6 months' commission            (G85)
+  Commission average     = Commission total / 6                   (G86)
+  Commission recognised  = Commission average x 60%               (G87)
+  OT                     = AVERAGEIF(>0) at 100%                   (H87)
+
+  Deductions (EPF / PCB / SOCSO) raw:
+     if Commission total > 0 : raw = sum / 6
+     else                    : raw = AVERAGEIF(>0)
+  Pro-rate factor (haircut to the 60% commission):
+     denom = Basic + Fixed + Commission average
+     ratio = denom > 0 ? (Basic + Fixed + Commission recognised) / denom : 0
+  EPF   = raw EPF   x ratio                                        (I87)
+  PCB   = raw PCB   x ratio                                        (J87)
+  SOCSO = raw SOCSO x ratio                                        (K87)
+
+  GROSS = Basic + Fixed + Other + Commission recognised + OT       (C118)
+  NET   = GROSS - EPF - PCB - SOCSO                                (C122)
+
+--------------------------------------------------------------------------------
+2.2 EPF / KWSP statement (up to 12 "Caruman Ahli" months)  [calcEPFIncome]
+--------------------------------------------------------------------------------
+Inputs: monthly employee contributions, EPF rate % (default 11),
+        manual deductions {epf, pcb, socso, other}.
+
+  rate           = (EPF rate % or 11) / 100
+  monthlyIncome  = each contribution / rate
+  Sort ascending, DROP the top 2 months, keep the non-zero remainder.
+  Fixed component    = average of the LOWEST up-to-6 non-zero months (E18)
+  Avg all non-zero   = average of all remaining non-zero months
+  Variable (raw)     = MAX(0, Avg all non-zero - Fixed)               (E20)
+  Variable recognised= 0.60 x Variable raw   (60% haircut, policy const)
+  GROSS              = Fixed + Variable recognised                    (E21)
+  Total deductions   = epf + pcb + socso + other
+  NET                = GROSS - Total deductions
+
+  Income Type classification (shown on screen instead of Total Deductions):
+     ratio = Variable raw / Fixed component
+     ratio <= 25%  -> "Fixed Income"   (variable is a small top-up)
+     ratio  > 25%  -> "Variable Income"
+  Note: the on-screen "Variable Income" tile shows the RAW variable component
+  (E20, e.g. 367), not the 60%-recognised figure.
+
+--------------------------------------------------------------------------------
+2.3 BIZMAN - Personal Financing master (12 months credit)  [calcBizman]
+--------------------------------------------------------------------------------
+Inputs: 12 months of {bank1, bank2} credits, profitMarginPct,
+        shareholdingPct, avgITRAnnual, taxDeduction, socso.
+
+  Avg monthly credit        = sum(12 months of bank1+bank2) / 12       (C111)
+  Monthly business income   = Avg credit x profitMargin% x shareholding%(F111)
+  Personal tax return (mth) = avgITRAnnual / 12                        (I111)
+  Variation acceptable      = Personal tax return x 25%                (J111)
+  Monthly personal income   = Personal tax return + Variation          (K111)
+  Variance                  = Monthly personal / Monthly business
+
+  GROSS = MIN(Monthly personal, Monthly business)                     (C113)
+          if that MIN = 0 -> MAX(Monthly personal, Monthly business)
+  NET   = GROSS - taxDeduction - socso                                (C122)
+
+--------------------------------------------------------------------------------
+2.4 BIZMAN - Home Financing master (differs from PF)       [calcBizmanHF]
+--------------------------------------------------------------------------------
+  Avg monthly credit        = sum(FIRST 6 months) / 6                  (C111)
+  Monthly business income   = Avg credit x profitMargin% x shareholding%
+  Personal tax return (mth) = avgITRAnnual / 12                        (I111)
+  Variation acceptable      = (Business > Personal tax) ? Personal x 25% : 0 (J111)
+  Monthly personal income   = Personal tax return + Variation          (K111)
+  taxDeduction (G111) carried to the Summary PCB line.
+
+--------------------------------------------------------------------------------
+2.5 HF COMBINED INCOME (main + joint applicants)          [calcHFIncomeMixed]
+--------------------------------------------------------------------------------
+Each applicant contributes its OWN stream - payslip months, an EPF statement,
+or business income - and they are summed (mixed joints allowed):
+  Payslip months are summed cell-by-cell across applicants, then the
+  section-2.1 rules run on the summed months.
+  Basic  C139 = payslip Basic + EPF Fixed + business K111
+  Other  C144 feed = payslip Other + EPF Variable recognised
+  GROSS  C144 = payslip GROSS + EPF GROSS + business K111
+  EPF    C145 = payslip EPF + EPF-statement deductions
+  PCB    C146 = payslip PCB + business tax (G111)
+  SOCSO  C147 = payslip SOCSO
+  NET    C148 = GROSS - EPF - PCB - SOCSO
+
+================================================================================
+3. CUSTOMER CLASS  TYPE A / TYPE B          [js/intake.js, hfSummary.js P12]
+================================================================================
+Auto-derived from GROSS income (recomputed on every change):
+
+  Customer Class = (GROSS income >= 5,000) ? TYPE B : TYPE A
+
+Drives PF DSR ceilings + NDI floor (section 6.5) and the existing credit-card
+line commitment (section 4.1). It is NOT the same as Customer TYPE
+(NORMAL / BIZMAN, which is income source).
+
+================================================================================
+4. EXISTING COMMITMENTS FROM CCRIS                   [js/engine/ccrisLine.js]
+================================================================================
+Per line: { capacity, collateral, facility, outstanding, limit,
+            commitmentPerCCRIS (J), override (K), floating }
+
+Manual override (K) present (incl. an explicit 0) -> commitment = |K|, done.
+
+Facility factor table (List!D:E)                    [js/engine/facilityRates.js]
+  CRDTCARD = 0.05 (special, see 4.1)   OVRDRAFT/TEMPOVDT = 0.0077529 (on LIMIT)
+  ISPWNBKG = 0 (pawn, excluded)        SHMARGIN = 0 (share margin, excluded)
+  HSLNFNCE / PELNFNCE / OTLNFNCE / ... = 1
+  Unknown facility code -> 1 (use the CCRIS instalment as-is)
+
+--------------------------------------------------------------------------------
+4.1 Credit card line  (facility = CRDTCARD)
+--------------------------------------------------------------------------------
+  G = |outstanding|,  H = |limit|
+  if G = 0 -> commitment = 0
+  O = 5% x G ; if 0 < O < 50 -> O = 50   (RM50 floor; see HF exception below)
+  P = (Customer Class = TYPE B) ? 0 : 5% x H
+  commitment = MAX(O, P)
+     TYPE A -> MAX(5%xG floored@50, 5%xH)   (charged against the full limit)
+     TYPE B -> 5%xG floored@50              (drawn balance only)
+  HF exception: in the HF master, TYPE B drops the RM50 floor (commitment=5%xG).
+
+--------------------------------------------------------------------------------
+4.2 Other facilities
+--------------------------------------------------------------------------------
+  JOINT capacity, housing (HL*/HS*)  -> (factor x J) / 2
+  JOINT capacity, other              -> J / 2
+  Overdraft (OVRDRAFT/TEMPOVDT)      -> H x 0.0077529     (on LIMIT)
+  Card-rate facilities               -> G x 5%, floored to RM50
+  Everything else                    -> factor x J        (factor usually 1)
+
+--------------------------------------------------------------------------------
+4.3 Balance transfer / settlement rows
+--------------------------------------------------------------------------------
+  BT (credit-card balance transfer)  repayment = 5% x |outstanding|,
+                                     floored to RM50  (HF master: NO floor)
+  SETTLE (facility to settle)        repayment = entered manually
+
+--------------------------------------------------------------------------------
+4.4 Stress test  (Excel col T)                      [facilityRates.stressFactorFor]
+--------------------------------------------------------------------------------
+Only FLOATING lines take an uplift; the increment is by collateral type
+(List!A28:B32, fixed table, not an input):
+  PROPERTIES   = 5%          CLEAN        = 0.8928571%
+  MOTOR V(JPJ) = 1.6544118%  UNIT TRUST   = 2.0833333%   unknown -> 0
+  stressCommitment = floating ? commitment x (1 + stressFactor) : commitment
+  Blank facility row -> factor 0.
+
+--------------------------------------------------------------------------------
+4.5 Totals                                          [ccrisLine.totalCommitments]
+--------------------------------------------------------------------------------
+  L55 Total Commitment      = sum of every line commitment
+  T   Stress Total          = sum of stressCommitment per line
+  Unsecured Total           = sum of commitments where collateral="CLEAN" AND
+                              facility in {CRDTCARD, OTLNFNCE, OVRDRAFT,
+                              PELNFNCE, RVVGCRDT, STLNFNCE, NHEDFNCE, PELNFNSA}
+  L56 Balance Transfer      = sum of BT repayments + SETTLE repayments
+  L57 Net Existing Commit.  = L55 - L56
+
+================================================================================
+5. AMORTISATION MATH                                     [js/engine/pmt.js]
+================================================================================
+  PMT(rate, nper, pv):
+     rate = 0  -> -pv / nper
+     else      -> -pv * rate * (1+rate)^nper / ((1+rate)^nper - 1)
+
+  Monthly amortising instalment = ROUND( PMT(annualRate/12, years*12, -amount), 0 )
+  Islamic selling price          = ROUND( PMT(annualRate/12, years*12, -amount)
+                                          * years*12, 0 )   (total payable)
+  PF flat-rate instalment        = (principal + principal x annualRate x years)
+                                   / tenureMonths           (years = months/12)
+     (labelled "Fixed Rate" on screen and in the PDF; the method is the flat,
+      non-amortising rate above.)
+
+================================================================================
+6. PERSONAL FINANCING (PF)                    [js/panels.js computePF; ndiPricing]
+================================================================================
+Inputs: amount, tenure (months), optional profit-rate deviation %.
+
+--------------------------------------------------------------------------------
+6.1 Experian PF risk grade from iScore                  [riskGradeFromIScore]
+--------------------------------------------------------------------------------
+  iScore <360 ->1  <=420 ->2  <=460 ->3  <=540 ->4  <=580 ->5
+        <=620 ->6  <=660 ->7  <=700 ->8  <=740 ->9  else ->10
+  (missing/<=0 -> null)
+
+--------------------------------------------------------------------------------
+6.2 Product classification by amount                    [classifyPFProduct]
+--------------------------------------------------------------------------------
+  Only when GROSS >= 5,000 AND amount is an exact RM500 step:
+     1,000 - 10,000  -> MICRO 1
+     10,500 - 20,000 -> MICRO 2
+  otherwise           -> OTHERS
+
+--------------------------------------------------------------------------------
+6.3 Profit rate lookup                                  [lookupPFRates]
+--------------------------------------------------------------------------------
+Data matrices live in data/ndiPricing.js (exported from List!). Axes:
+  row    = Experian risk grade 1-10
+  column = tenure in whole YEARS 1-10 (EXACT match; tenure/12 must be integer)
+  OTHERS income band: <3000 none | 3000-4999 | 5000-14999 | 15000-29999 | >=30000
+  MICRO 1 / MICRO 2 use their own grids.
+  Returns { flat, epr } as p.a. fractions (null = NA for that cell).
+
+Rate actually used (Excel G116):
+  rateFrac = (deviation% > 0) ? deviation%/100 : matrix flat rate
+
+--------------------------------------------------------------------------------
+6.4 Eligibility gate (Excel H113) - on GROSS income      [pfEligibilityGate]
+--------------------------------------------------------------------------------
+  GROSS < 3000                      -> NOT ELIGIBLE
+  GROSS >= 5000                     -> OK
+  3000 <= GROSS < 5000              -> amount must be <= grade limit (below),
+                                       above it -> EXCEED LIMIT
+  Max financing by PF risk grade (List!BC:BD):
+     grade 4 -> 20,000   5 -> 30,000   6 -> 30,000   7 -> 40,000
+     grade 8 -> 40,000   9 -> 50,000  10 -> 50,000
+  (In band 3000-4999 with no grade limit row (grades 1-3): NOT ELIGIBLE.)
+
+--------------------------------------------------------------------------------
+6.5 DSR ceiling + NDI floor (Customer Class)             [pfThreshold/pfVerdict]
+--------------------------------------------------------------------------------
+  TYPE A: DSR cap = 60%              ; NDI min = RM 2,000
+  TYPE B: DSR cap = (GROSS < 10,000) ? 70% : 75% ; NDI min = RM 1,500
+  PF verdict is on DSR only (Excel H123): DSR <= cap -> OK, else DSR BURST.
+  (NDI vs NDI-min is shown for reference; it does not flip the verdict.)
+
+--------------------------------------------------------------------------------
+6.6 PF result figures
+--------------------------------------------------------------------------------
+  Instalment          = flat-rate instalment(amount, rateFrac, months)   [5]
+  New Commitment      = L57 + Instalment                              (G121)
+  New Commitment(preBT)= L55 + Instalment - H72(PF settlements)       (L121)
+  NDI                 = NET income - New Commitment                   (G122)
+  New DSR (after BT)  = New Commitment / NET income
+  New DSR (before BT) = New Commitment(preBT) / NET income
+  Current DSR         = L55 / NET income
+
+  Unsecured DSR block (Excel G125):
+     unsecured commit = MAX(0, Unsecured Total + Instalment - L56)
+     unsecured DSR    = unsecured commit / NET income
+     Unsecured cap (List P14:Q17): GROSS>=10001 ->70% ; >=6001 ->65% ;
+                                    >=4500 ->60% ; else 0
+     Max Unsecured Multiplier (MUM): GROSS>15000 ->14 ; >10000 ->13 ; else 9
+
+  Stress test (Excel G132):
+     stress commit = (Stress Total - L56) + Instalment
+     stress DSR    = stress commit / NET income
+     stress cap    = (GROSS < 10,000) ? 70% : 75%  (both classes)
+     DSR <= cap -> OK else DSR BURST
+
+Gate overrides the verdict: final verdict = (gate != OK) ? gate : DSR verdict.
+
+================================================================================
+7. CREDIT CARD (CC)                             [js/engine/creditLimit.js]
+================================================================================
+Inputs: product (VISA_PLATINUM | VISA_SIGNATURE | BOTH), optional proposed limit.
+
+  Multiplier from iScore (risk-grade bands):
+     iScore < 605 -> null (not eligible; below RG5)
+     <=619 ->3(RG5)  <=634 ->4  <=649 ->5  <=664 ->6  <=679 ->7  else ->8(RG10)
+
+  Card minimum limit: SIGNATURE or BOTH -> RM 4,000 ; PLATINUM -> RM 2,000
+  Card maximum limit: RM 400,000
+
+  roundedGross  = floor(GROSS / 100) x 100
+  rawMaxLimit   = multiplier ? floor(roundedGross x multiplier / 1000) x 1000 : 0
+  Salary cap (PLATINUM or BOTH, GROSS 2,000-3,000):
+     capped = MIN(rawMaxLimit, GROSS x 2)
+  maxCreditLimit    = MIN(capped, 400,000)
+  eligibleByLimit   = multiplier != null AND maxCreditLimit >= card minimum
+  Monthly instalment= CEIL(maxCreditLimit x 1%)
+  (Officer-proposed limit: instalment = CEIL(limit x 1%); eligible if
+   card min <= limit <= 400,000.)
+
+  CC DSR threshold by GROSS band: <5000 ->60% ; 5000-10000 ->70% ; >10000 ->75%
+  New Commitment (after BT) = L57 + instalment ; (before BT) = L55 + instalment
+  DSR = New Commitment / NET income ;  NDI = NET income - New Commitment
+  Verdict: eligibleByLimit AND 0 < DSR <= threshold -> ELIGIBLE, else NOT ELIGIBLE
+
+================================================================================
+8. HOME FINANCING (HF) - DSR                         [js/engine/hfSummary.js]
+================================================================================
+Per financing term (HF col G, or one HOA term J/K):
+  FEC (entry cost)   = valuation + legal
+  Total Financing    = financing + MRTT + FEC
+  Effective Rate     = (SBR% + spread%) / 100
+  Instalment         = ROUND( PMT(eff/12, years*12, -Total Financing), 0 )
+  Total MOF          = Total Financing / property value
+
+Commitments (per applicant, then summed for the Summary):
+  L55 = sum of that applicant's CCRIS line commitments (HF variant)
+  L56 = BT (5% x outstanding, NO RM50 floor) + manual settlements
+  L57 = L55 - L56
+
+DSR decision (Summary G158-G162):
+  ctf = commit-to-finance override (Summary G159), if entered
+  New Commitment = (ctf != 0) ? ctf + L57 : L57 + Instalment       (G160)
+  New DSR        = New Commitment / NET income (0 if either is 0)   (G162)
+  HF DSR threshold (income-banded, by Customer TYPE):
+     NORMAL: GROSS<3000 -> fail(0) ; >=3000 ->70% ; >=5000 ->80% ; >=16500 ->85%
+     BIZMAN: GROSS>=5000 ->80% ; >=16500 ->85% ; below -> fail(0)
+  Verdict (H162): DSR = 0 -> blank ; threshold >= DSR -> OK ; else DSR BURST
+
+HOME ONE ACCOUNT (two parallel terms):
+  SBR and Ceiling shared; financing/MRTT/costs/tenure/spread per term.
+  Total Financing / Instalment = Term1 + Term2 ; each term amortised on its own
+  effective rate. "Instalment on full tenure": Term2 re-amortised over Term1's
+  tenure.
+
+================================================================================
+9. HF PRICING QUOTATIONS (instalment / selling price only) [js/engine/hfPricing.js]
+================================================================================
+Quotation calculators (no DSR). Rates are fractions.
+
+  Structured Rate:
+     FEC = valuation+legal ; Total = financing+MRTT+FEC ; Eff = base+spread
+     Original MOF = financing/property ; Total MOF = Total/property
+     Selling price       = sellingPrice(ceiling, tenure, Total)
+     Instalment@ceiling  = monthlyInstalment(ceiling, tenure, Total)
+     Instalment@effective= monthlyInstalment(Eff, tenure, Total)
+     Note: (MRTT+FEC)/property <= 5% -> "within 5%" else "exceeded 5%"
+
+  Fixed Rate:
+     Entry = MRTT+valuation+legal ; Total = financing+Entry
+     Entry guide (3%) = property x 3% ; Entry ratio = Entry/property
+     Selling price / Instalment = at the fixed rate
+     Note: Entry ratio <= 5% -> "within 5%"
+
+  PUC (under construction, grace period):
+     FEC, Total, Eff as Structured.
+     Selling w/ grace = ROUND( ceiling x Total x graceYears
+                               + PMT(ceiling/12, tenure*12, -Total)*tenure*12 )
+     Grace monthly profit = (rate x Total)/12   (ceiling and effective versions)
+
+  Home One Account (two terms):
+     Per term: FEC, Total = financing+renovation+MRTT+FEC, Eff = SBR+spread.
+     Blended rate = weighted by each term's Total Financing.
+
+================================================================================
+10. VERDICT WORDING (officer-facing)                 [js/engine/dsrThresholds.js]
+================================================================================
+Internally the engine keeps the Excel master's own strings (OK, DSR BURST,
+NOT ELIGIBLE, EXCEED LIMIT, ELIGIBLE) so the parity tests stay honest. Every
+screen and the PDF collapse them to two states:
+
+  verdictLabel(v):  OK / ELIGIBLE            -> APPROVED  (green)
+                    anything else            -> REJECTED  (red)
+                    blank (DSR 0, no facility)-> blank
+
+================================================================================
+11. KEY CONSTANTS
+================================================================================
+  Credit-card commitment rate ......... 5%   (min RM50; HF TYPE B no floor)
+  Overdraft / temp OD rate ............ 0.77529% of LIMIT
+  Commission recognition .............. 60%
+  EPF variable recognition ............ 60%
+  BIZMAN variation acceptable ......... 25% of monthly ITR
+  Customer Class break ................ GROSS RM 5,000  (A below, B at/above)
+  Card limit maximum .................. RM 400,000
+  Card monthly instalment ............. 1% of limit
+  Income breaks (PF DSR / CC) ......... RM 5,000 / 10,000 / 15,000
+  HF income bands ..................... RM 3,000 / 5,000 / 16,500
+
+================================================================================
+END - generated as a plain-English mirror of the calculation engine. The code
+in js/engine/ and data/ndiPricing.js is authoritative; if they ever differ,
+the code wins (and this file should be updated).
+================================================================================

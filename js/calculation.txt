@@ -1,0 +1,41 @@
+1. Personal Financing — DSR cap & NDI floor
+
+pfThreshold(grossIncome, class)
+
+TYPE A:
+    DSR cap  = 60%
+    NDI min  = RM 2,000
+
+TYPE B:
+    DSR cap  = (Gross < RM 10,000) ? 70% : 75%
+    NDI min  = RM 1,500
+
+Verdict:  DSR ≤ DSR cap  →  APPROVED,  else REJECTED
+          (NDI vs NDI-min is shown for reference; it does not flip the verdict)
+
+PF stress test (floating-rate block) ignores the class — both use:
+Stress DSR cap = (Gross < RM 10,000) ? 70% : 75%
+
+2. Existing credit-card commitment in CCRIS
+
+For a CRDTCARD line with outstanding G and limit H (ccrisLine.js):
+
+if G = 0:                          commitment = 0
+
+O = 5% × G ;  if 0 < O < 50  →  O = 50      (RM 50 floor)
+P = (class = TYPE B) ? 0 : 5% × H
+
+commitment = MAX(O, P)
+
+Written out per class:
+TYPE A:  commitment = MAX( 5%×G (min 50) , 5%×H )      ← charges against the LIMIT too
+TYPE B:  commitment =      5%×G (min 50)                ← outstanding only
+
+Home Financing variant nuance: in the HF master, TYPE B drops the RM 50 floor (so commitment = 5%×G, no minimum); PF keeps the RM 50 floor. TYPE A is identical in both.
+
+Net effect
+
+TYPE B  →  higher DSR ceiling  +  lower NDI floor  +  lighter card commitment  (more favourable)
+TYPE A  →  60% cap  +  RM2,000 NDI floor  +  card charged on full limit        (stricter)
+
+Two things TYPE A/B does not touch: a new card's approved limit (driven by income + iScore + product), and the Home Financing DSR cap itself (which uses income bands 70/80/85%, not these A/B numbers).
