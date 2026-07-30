@@ -1,0 +1,6 @@
+# runtime database (created by bin/seed_admin.php / app/Db.php)
+storage/*.sqlite
+storage/*.sqlite-shm
+storage/*.sqlite-wal
+
+.DS_Store

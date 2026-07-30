@@ -60,9 +60,9 @@ body {
   position: sticky;
   top: 0;
   height: 100vh;
-  overflow-y: auto;
 }
 .sidebar .brand {
+  flex: 0 0 auto;
   padding: 18px 16px 16px;
   border-bottom: 1px solid rgba(255,255,255,.12);
   display: flex; align-items: center; gap: 10px;
@@ -73,6 +73,15 @@ body {
   font-size: 11px; letter-spacing: .04em;
   color: rgba(255,255,255,.72);
 }
+/* every nav-item/group-label lives in here so the button list scrolls
+   on its own (scrollbar hidden) while brand (above) and foot (below,
+   next rule) always stay put - no more "everything shifts off screen"
+   once a sidebar has enough buttons to overflow the viewport */
+.sidebar-scroll {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.sidebar-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .sidebar .group-label {
   padding: 18px 16px 6px;
   font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
@@ -81,10 +90,10 @@ body {
 }
 .nav-item {
   display: flex; align-items: center; gap: 10px;
-  width: 100%;
+  width: 100%; box-sizing: border-box;
   padding: 9px 16px;
   background: none; border: none; color: rgba(255,255,255,.85);
-  font: inherit; font-size: 13px;
+  font: inherit; font-size: 13px; text-decoration: none;
   text-align: left; cursor: pointer;
   border-left: 3px solid transparent;
   transition: background .12s, color .12s;
@@ -98,7 +107,7 @@ body {
 }
 .nav-item svg { flex-shrink: 0; opacity: .85; }
 .sidebar .foot {
-  margin-top: auto;
+  flex: 0 0 auto;
   padding: 14px 16px;
   border-top: 1px solid rgba(255,255,255,.12);
   display: flex; flex-direction: column; gap: 8px;
@@ -118,6 +127,7 @@ body {
 .layout.sidebar-collapsed .sidebar { width: 60px; }
 .layout.sidebar-collapsed .nav-txt,
 .layout.sidebar-collapsed .group-label,
+.layout.sidebar-collapsed .case-info-chip,
 .layout.sidebar-collapsed .brand .t2 { display: none; }
 .layout.sidebar-collapsed .brand { padding: 16px 6px; align-items: center !important; }
 .layout.sidebar-collapsed .brand-logo { padding: 4px; }
@@ -231,6 +241,12 @@ input.override-active, td.override input.has-value {
   background: var(--override) !important;
   border-color: var(--override-border) !important;
 }
+input.readonly {
+  background: var(--readonly);
+  border-color: var(--readonly-border);
+  color: var(--dark);
+  font-weight: 600;
+}
 .readonly-val {
   display: block;
   background: var(--readonly);
@@ -335,13 +351,16 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
   border: 1px solid var(--primary); border-radius: 6px;
   padding: 8px 14px; font: inherit; font-size: 13px; font-weight: 600;
   cursor: pointer;
-  transition: background .12s;
+  transition: background .12s, transform .12s, box-shadow .12s;
 }
-.btn:hover { background: #0C3E69; }
+.btn:hover { background: #0C3E69; transform: translateY(-1px); box-shadow: 0 6px 14px rgba(15,76,129,.24); }
+.btn:active { transform: translateY(0); box-shadow: none; transition-duration: .05s; }
+.btn:disabled { cursor: not-allowed; opacity: .55; transform: none; box-shadow: none; }
 .btn.secondary { background: #fff; color: var(--primary); border-color: var(--border-strong); font-weight: 600; }
-.btn.secondary:hover { background: #F1F4F8; }
+.btn.secondary:hover { background: #F1F4F8; box-shadow: 0 6px 14px rgba(16,32,48,.1); }
 .btn.small { padding: 5px 11px; font-size: 12px; }
 .btn.danger { background: var(--accent); border-color: var(--accent); }
+.btn.danger:hover { box-shadow: 0 6px 14px rgba(179,38,30,.3); }
 
 /* ---------------- upload zones ---------------- */
 .dropzone {
@@ -660,6 +679,17 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
     font-size: 8px; line-height: 1.5; color: var(--muted); text-align: center;
     break-inside: avoid;
   }
+
+  /* decision watermark: repeats on every printed page (position:fixed) */
+  .rep-stamp {
+    position: fixed; top: 45%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-18deg);
+    font-size: 64px; font-weight: 800; letter-spacing: .08em;
+    border: 6px solid; border-radius: 10px; padding: 6px 28px;
+    opacity: .28; z-index: 999; pointer-events: none;
+  }
+  .rep-stamp.approved { color: var(--ok); border-color: var(--ok); }
+  .rep-stamp.rejected { color: var(--fail); border-color: var(--fail); }
 }
 
 /* ---------------- responsive ---------------- */

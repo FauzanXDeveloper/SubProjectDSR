@@ -138,17 +138,19 @@
         '<option value="VISA_SIGNATURE"' + (App.state.cc.product === 'VISA_SIGNATURE' ? ' selected' : '') + '>Visa Signature</option>' +
         '<option value="BOTH"' + (App.state.cc.product === 'BOTH' ? ' selected' : '') + '>Both (Platinum + Signature)</option></select></div>';
     }
+    // Once an Experian PDF has populated the identity, lock it against
+    // edits (matches the CCRIS table's "extracted rows are locked"
+    // convention) - a fully manual intake (no Experian) stays editable.
+    var locked = !!c.fromExperian;
+    var lockAttr = locked ? ' disabled' : '';
+    var lockCls = locked ? 'readonly' : 'editable';
     var body =
-      '<div class="legend">' +
-      '<span><span class="sw" style="background:var(--editable)"></span>Editable input</span>' +
-      '<span><span class="sw" style="background:var(--readonly)"></span>Calculated (read-only)</span>' +
-      '<span><span class="sw" style="background:var(--override)"></span>Override applied</span></div>' +
       '<div class="grid c4">' +
       // row 1
       '<div class="field"><label>Customer Name</label>' +
-      '<span class="readonly-val left ellipsis" id="cust-name" title="' + (esc(c.name) || '') + '">' + (esc(c.name) || '-') + '</span></div>' +
+      '<input class="' + lockCls + '" id="cust-name"' + lockAttr + ' value="' + esc(c.name) + '"></div>' +
       '<div class="field"><label>IC / Passport Number</label>' +
-      '<span class="readonly-val left ellipsis" id="cust-ic" title="' + (esc(E.formatIC(c.ic)) || '') + '">' + (esc(E.formatIC(c.ic)) || '-') + '</span></div>' +
+      '<input class="' + lockCls + '" id="cust-ic" data-fmt="ic"' + lockAttr + ' value="' + esc(E.formatIC(c.ic)) + '"></div>' +
       '<div class="field"><label>Age (derived from IC)</label>' +
       '<span class="readonly-val" id="cust-age">-</span></div>' +
       // Customer Type: on HF pages it is set per applicant in the income
@@ -161,13 +163,28 @@
       '<div class="field"><label>Report Date</label>' +
       '<span class="readonly-val" id="cust-reportdate">' + esc(App.state.reportDate || '-') + '</span></div>' +
       '<div class="field"><label>Experian iScore</label>' +
-      '<span class="readonly-val" id="cust-iscore">' + (esc(App.state.iScore) || '-') + '</span></div>' +
+      '<input class="' + lockCls + '" id="cust-iscore"' + lockAttr + ' type="text" inputmode="numeric" value="' + esc(App.state.iScore) + '"></div>' +
       '<div class="field"><label>Customer Class (derived from gross income)</label>' +
       '<span class="readonly-val" id="cust-cardtype">' + esc(c.cardType) + '</span></div>' +
       lastField +
       '</div>';
     el('intake-customer').innerHTML = card('card-customer', 'STEP A', 'Customer Details', body);
 
+    var nameInp = el('cust-name');
+    if (nameInp) nameInp.oninput = function () {
+      App.state.customer.name = this.value;
+      App.refreshOutputs();
+    };
+    var icInp = el('cust-ic');
+    if (icInp) icInp.oninput = function () {
+      App.state.customer.ic = this.value;
+      App.refreshOutputs();
+    };
+    var iscoreInp = el('cust-iscore');
+    if (iscoreInp) iscoreInp.oninput = function () {
+      App.state.iScore = this.value;
+      App.refreshOutputs();
+    };
     var ctypeSel = el('cust-type');
     if (ctypeSel) ctypeSel.onchange = function () {
       App.state.customer.type = this.value;
@@ -236,7 +253,7 @@
       var h = '<tr data-i="' + i + '" class="src-' + src + (n === '' ? ' sub-line' : '') + '">' +
         '<td class="num">' + n + '</td>';
       if (editable) {
-        h += '<td class="editable"><input data-f="date" value="' + esc(r.date) + '" style="min-width:86px"></td>' +
+        h += '<td class="editable"><input data-f="date" type="date" value="' + esc(r.date) + '" style="min-width:86px"></td>' +
           '<td class="editable">' + selectHtml(CAPACITIES, r.capacity).replace('<select', '<select data-f="capacity"') + '</td>' +
           '<td class="editable">' + selectHtml(COLLATERALS, r.collateral).replace('<select', '<select data-f="collateral"') + '</td>' +
           '<td class="editable"><input data-f="facility" list="facility-list" value="' + esc(r.facility) + '" style="min-width:96px;text-transform:uppercase"></td>' +
@@ -297,7 +314,6 @@
       return '<tr data-bti="' + i + '">' +
         '<td class="editable">' + selectHtml(['BT', 'SETTLE'], r.type).replace('<select', '<select data-btf="type"')
           .replace('>BT<', '>CC Balance Transfer<').replace('>SETTLE<', '>Facility Settlement<') + '</td>' +
-        '<td class="editable"><input data-btf="description" value="' + esc(r.description) + '"></td>' +
         '<td class="editable"><input data-btf="outstanding" type="text" inputmode="decimal" data-fmt="money" value="' + esc(r.outstanding) + '"' + (r.type !== 'BT' ? ' disabled' : '') + '></td>' +
         (r.type === 'BT'
           ? '<td class="readonly" id="bt-rep-' + i + '">-</td>'
@@ -309,17 +325,12 @@
       '<div class="dropzone" id="dz-experian">' +
       '<div class="dz-title">Experian report</div>' +
       '<div class="dz-sub">' + (pdfOk
-        ? 'Drop or click. PDF or saved .json.'
-        : 'PDF library missing - key rows in below, or load a .json session.') +
-      '</div><input type="file" id="file-experian" accept=".pdf,.json" style="display:none"></div>' +
+        ? 'Drop or click the Experian PDF.'
+        : 'PDF library missing - key the CCRIS rows in manually below.') +
+      '</div><input type="file" id="file-experian" accept=".pdf" style="display:none"></div>' +
       '<div id="dz-experian-msg"></div>' +
 
       '<div class="subhead">CCRIS Records (existing debts)</div>' +
-      '<div class="legend">' +
-      '<span><span class="sw" style="background:var(--primary)"></span>Original CCRIS (from report - locked)</span>' +
-      '<span><span class="sw" style="background:var(--accent)"></span>NLCI non-bank lender (from report - locked)</span>' +
-      '<span><span class="sw" style="background:var(--gold)"></span>Manually added (editable)</span>' +
-      '<span><span class="sw" style="background:var(--override)"></span>Override column (SSU) - the only editable field on extracted rows</span></div>' +
       '<datalist id="facility-list">' + FACILITY_OPTIONS.map(function (o) {
         return '<option value="' + o + '">'; }).join('') + '</datalist>' +
       '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
@@ -336,11 +347,11 @@
 
       '<div class="subhead">Balance Transfer / Facilities To Be Settled</div>' +
       '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
-      '<th>Type</th><th>Description</th><th>Outstanding (RM)</th><th>Monthly Repayment (RM)</th><th></th>' +
+      '<th>Type</th><th>Outstanding (RM)</th><th>Monthly Repayment (RM)</th><th></th>' +
       '</tr></thead><tbody id="bt-tbody">' + btRows + '</tbody>' +
-      '<tfoot><tr class="total-row"><td colspan="3">Total To Be Settled (L56)</td>' +
+      '<tfoot><tr class="total-row"><td colspan="2">Total To Be Settled (L56)</td>' +
       '<td class="num" id="bt-total">-</td><td></td></tr>' +
-      '<tr class="total-row"><td colspan="3">Grand Total Commitment After Settlement (L57 = L55 - L56)</td>' +
+      '<tr class="total-row"><td colspan="2">Grand Total Commitment After Settlement (L57 = L55 - L56)</td>' +
       '<td class="num" id="grand-total">-</td><td></td></tr></tfoot></table></div>' +
       '<div style="margin-top:8px"><button class="btn small secondary" id="btn-add-bt" type="button">+ Add settlement row</button></div>';
 
@@ -371,7 +382,7 @@
       App.state.ccris.push(newCCRISRow()); App.renderCCRIS(); App.refreshOutputs();
     };
     el('btn-add-bt').onclick = function () {
-      App.state.bt.push({ type: 'BT', description: '', outstanding: '', repayment: '' });
+      App.state.bt.push({ type: 'BT', outstanding: '', repayment: '' });
       App.renderCCRIS(); App.refreshOutputs();
     };
 
@@ -449,17 +460,6 @@
   async function handleExperianFiles(files) {
     var file = files[0];
     if (!file) return;
-    if (/\.json$/i.test(file.name)) {
-      try {
-        var text = await file.text();
-        App.importJSON(JSON.parse(text));
-        App.renderAll();
-        dzState('dz-experian', 'success', 'Session loaded from ' + esc(file.name) + '.');
-      } catch (e) {
-        dzState('dz-experian', 'error', 'Could not read session file: ' + esc(e.message));
-      }
-      return;
-    }
     dzState('dz-experian', 'loading', 'Reading ' + esc(file.name) + ' ...');
     try {
       var res = await E.extractFromExperian(file);
@@ -480,6 +480,8 @@
       if (res.icNumber) s.customer.ic = res.icNumber;
       if (res.iScore != null) s.iScore = res.iScore;
       if (res.reportDate) s.reportDate = res.reportDate;
+      // identity now came from the report - lock Step A against edits
+      if (res.name || res.icNumber) s.customer.fromExperian = true;
       s.ccris = res.records.concat(res.nlciRecords);
       App.renderAll();
       dzState('dz-experian', 'success',
@@ -806,16 +808,15 @@
 
     var ageEl = el('cust-age');
     if (ageEl) ageEl.textContent = c.age != null ? c.age + ' years' : '-';
-    [['cust-name', s.customer.name], ['cust-ic', E.formatIC(s.customer.ic)],
-     ['cust-iscore', s.iScore],
-     ['cust-cardtype', s.customer.cardType], ['cust-reportdate', s.reportDate]
+    // Name / IC / iScore are directly-editable inputs now (see cust-name
+    // etc. bindings below) - never overwritten here, or typing would fight
+    // this refresh. Experian extraction re-syncs them via a full
+    // App.renderAll(), not this incremental path.
+    [['cust-cardtype', s.customer.cardType], ['cust-reportdate', s.reportDate]
     ].forEach(function (p) {
       var n = el(p[0]);
       if (n) n.textContent = (p[1] === '' || p[1] == null) ? '-' : p[1];
     });
-    // keep the ellipsis tooltip in sync with the (possibly long) values
-    var nameEl = el('cust-name'); if (nameEl) nameEl.title = s.customer.name || '';
-    var icEl = el('cust-ic'); if (icEl) icEl.title = E.formatIC(s.customer.ic) || '';
 
     // print / PDF header metadata
     var pm = el('print-meta');
@@ -898,8 +899,7 @@
     // gate
     var gate = el('intake-gate');
     if (gate) {
-      gate.innerHTML = c.intakeReady ? '' :
-        '<div class="notice">Add the Experian report and income to unlock the calculators.</div>';
+      gate.innerHTML = '';
     }
   };
 })();

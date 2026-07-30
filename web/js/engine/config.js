@@ -2,12 +2,14 @@
    config.js - central policy configuration.
 
    Every hard-coded policy number the engine uses lives HERE as a
-   default. admin.html writes overrides to localStorage; this file
-   merges them over the defaults at load time, so the calculator
-   picks up admin changes on the next page load.
+   default. admin/settings.php (admin-only) saves overrides to the
+   policy_config DB table; the PHP page injects them as
+   window.__DSR_CONFIG_OVERRIDES before this script runs, so the
+   calculator/editor always start from the server's current value -
+   no browser storage involved.
 
-   MUST be loaded BEFORE every other engine file (index.html,
-   admin.html and the Node test bootstraps).
+   MUST be loaded BEFORE every other engine file (index.php,
+   admin/settings.php and the Node test bootstraps).
 
    The DEFAULTS below are the values from the master Excels - the
    parity tests run against them, so with no overrides saved the
@@ -16,8 +18,6 @@
 (function () {
   'use strict';
   var Engine = window.Engine = window.Engine || {};
-
-  var STORAGE_KEY = 'dsrConfigOverrides';
 
   var DEFAULTS = {
     /* Customer Class: TYPE B at/above this gross income, TYPE A below */
@@ -114,17 +114,14 @@
 
   function loadOverrides() {
     try {
-      if (window.__DSR_TEST_DEFAULTS) return null;            // parity test page
-      if (typeof localStorage === 'undefined') return null;   // Node (tests)
-      var raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) { return null; }
+      if (window.__DSR_TEST_DEFAULTS) return null;             // parity test page
+      return window.__DSR_CONFIG_OVERRIDES || null;            // injected by PHP (index.php / admin/settings.php)
+    } catch (e) { return null; }                                // Node (tests): window is undefined
   }
 
   var overrides = loadOverrides();
   Engine.DEFAULT_CONFIG = DEFAULTS;
   Engine.CONFIG = overrides ? merge(clone(DEFAULTS), overrides) : clone(DEFAULTS);
-  Engine.CONFIG_KEY = STORAGE_KEY;
   Engine.CONFIG_HAS_OVERRIDES = !!overrides;
   Engine.mergeConfig = merge;
   Engine.cloneConfig = clone;

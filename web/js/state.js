@@ -1,8 +1,11 @@
 /* ============================================================
-   state.js - shared in-memory session state + JSON export/import
+   state.js - shared in-memory session state.
    One CCRIS + income intake feeds every product panel (the whole
-   point of the combo modes). No server, no cookies - session can
-   be saved to a .json file and reloaded by dropping it back in.
+   point of the combo modes). State lives only in this in-memory
+   object - never localStorage/sessionStorage. It reaches the server
+   exactly once, on deliberate "Submit to Checker" (caseSync.js);
+   resuming a submitted case re-populates it fresh from the DB on
+   each page load (web/index.php injects window.__DSR_CASE).
    ============================================================ */
 (function () {
   'use strict';
@@ -52,7 +55,11 @@
       savedAt: null,
       customer: {
         name: '', ic: '', type: 'NORMAL', segment: '',
-        cardType: 'TYPE A'   // TYPE A / TYPE B (CC limit treatment + PF thresholds)
+        cardType: 'TYPE A',  // TYPE A / TYPE B (CC limit treatment + PF thresholds)
+        // true once an Experian PDF has populated name/ic - locks Step A
+        // against edits so the extracted identity can't be quietly changed;
+        // stays false (editable) for a fully manual, no-Experian intake.
+        fromExperian: false
       },
       iScore: '',
       reportDate: '',
@@ -143,20 +150,11 @@
 
   var state = defaultState();
 
-  function exportJSON() {
-    state.savedAt = new Date().toISOString();
-    var name = (state.customer.name || 'session').replace(/[^\w-]+/g, '_');
-    var blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'DSR_' + name + '_' + new Date().toISOString().slice(0, 10) + '.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
-  }
-
-  /** Merge an imported session over a fresh default (tolerates older files). */
+  /** Merge a case's saved state over a fresh default (tolerates older
+      records). Used by caseSync.js to load a submitted case from the
+      server - the only source of a non-blank state now that the old
+      "drop a .json file" / "Export session" flow is gone (case data is
+      never written to a local file or browser storage). */
   function importJSON(obj) {
     var fresh = defaultState();
     function merge(target, src) {
@@ -194,7 +192,6 @@
   window.App = window.App || {};
   window.App.state = state;
   window.App.defaultState = defaultState;
-  window.App.exportJSON = exportJSON;
   window.App.importJSON = importJSON;
   window.App.resetState = resetState;
 })();

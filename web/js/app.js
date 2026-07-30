@@ -27,7 +27,7 @@
   App.applyMode = function () {
     App.mode = currentModeFromHash();
     el('page-title').textContent = MODES[App.mode];
-    document.querySelectorAll('.nav-item').forEach(function (btn) {
+    document.querySelectorAll('.nav-item[data-mode]').forEach(function (btn) {
       btn.classList.toggle('active', btn.dataset.mode === App.mode);
     });
     var ready = App.computed.intakeReady;
@@ -94,7 +94,7 @@
       location.hash = '#/' + mode;
       el('sidebar').classList.remove('open');
     }
-    document.querySelectorAll('.nav-item').forEach(function (btn) {
+    document.querySelectorAll('.nav-item[data-mode]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var target = btn.dataset.mode;
         if (target === App.mode) { el('sidebar').classList.remove('open'); return; }
@@ -137,11 +137,12 @@
       applyCollapsed(on);
       try { localStorage.setItem('sidebarCollapsed', on ? '1' : '0'); } catch (e) {}
     });
-    el('btn-export').addEventListener('click', App.exportJSON);
     el('btn-print').addEventListener('click', function () {
       if (App.printReport) App.printReport(); else window.print();
     });
-    el('btn-reset').addEventListener('click', function () {
+    // not rendered when viewing an existing (locked, read-only) case
+    var resetBtn = el('btn-reset');
+    if (resetBtn) resetBtn.addEventListener('click', function () {
       App.modal.confirm(
         'This clears every field for this session. Export to JSON first if you want to keep it.',
         { title: 'Reset all inputs?', okLabel: 'Reset everything', danger: true }

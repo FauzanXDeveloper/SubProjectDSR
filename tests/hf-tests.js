@@ -11,11 +11,11 @@
   if (typeof window === 'undefined') {
     global.window = global;
     var path = require('path');
-    ['../js/engine/config.js',
-     '../js/engine/pmt.js', '../js/engine/age.js', '../js/engine/facilityRates.js',
-     '../js/engine/ccrisLine.js', '../js/engine/income.js', '../js/engine/creditLimit.js',
-     '../js/engine/dsrThresholds.js', '../js/engine/hfPricing.js', '../js/engine/hfSummary.js',
-     '../data/ndiPricing.js'
+    ['../web/js/engine/config.js',
+     '../web/js/engine/pmt.js', '../web/js/engine/age.js', '../web/js/engine/facilityRates.js',
+     '../web/js/engine/ccrisLine.js', '../web/js/engine/income.js', '../web/js/engine/creditLimit.js',
+     '../web/js/engine/dsrThresholds.js', '../web/js/engine/hfPricing.js', '../web/js/engine/hfSummary.js',
+     '../web/data/ndiPricing.js'
     ].forEach(function (f) { require(path.join(__dirname, f)); });
   }
 

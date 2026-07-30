@@ -1,10 +1,10 @@
 /* ============================================================
-   admin.js - Calculation Settings editor (admin.html).
+   admin.js - Calculation Settings editor (admin/settings.php).
 
-   Edits Engine.CONFIG values and saves them as overrides in
-   localStorage (Engine.CONFIG_KEY). The calculator merges those
-   overrides over the Excel defaults on its next load. Reset
-   removes the overrides entirely.
+   Edits Engine.CONFIG values and POSTs them as overrides to
+   /api/config_save.php (policy_config table, admin-only). Every
+   user's calculator merges those overrides over the Excel defaults
+   on its next page load. Reset clears the overrides entirely.
 
    PF pricing matrices: edited per grid (raw fractions p.a.,
    blank = NA); included in the saved overrides only once a cell
@@ -205,8 +205,11 @@
       body += '<tr><th>RG ' + (r + 1) + '</th>';
       for (var c = 0; c < 10; c++) {
         var v = g[r][c];
+        // stored as a fraction p.a. (0.135 = 13.5%); shown/edited as a
+        // percent to 2 decimal places, which is how these rates are
+        // actually quoted
         body += '<td><input data-mx="' + key + '" data-r="' + r + '" data-c="' + c +
-          '" value="' + (v == null ? '' : v) + '"></td>';
+          '" value="' + (v == null ? '' : (v * 100).toFixed(2)) + '"></td>';
       }
       body += '</tr>';
     }
@@ -218,7 +221,7 @@
     }).join('');
     return '<div class="card"><div class="card-head"><span>PF Pricing Matrices (profit rates)</span></div>' +
       '<div class="card-body">' +
-      '<div class="adm-note">Rates are FRACTIONS per annum (0.135 = 13.5% p.a.). Blank = not available (NA). ' +
+      '<div class="adm-note">Rates are % per annum, to 2 decimal places (13.50 = 13.50% p.a.). Blank = not available (NA). ' +
       'Rows = Experian PF risk grade 1-10, columns = tenure in whole years.</div>' +
       '<div class="field narrow" style="max-width:420px;margin-bottom:10px"><label>Matrix</label>' +
       '<select class="editable" id="mx-select">' + opts + '</select></div>' +
@@ -238,15 +241,28 @@
     el('mx-host').innerHTML = matrixTable(el('mx-select').value);
     el('mx-select').onchange = function () { el('mx-host').innerHTML = matrixTable(this.value); };
     wireNav();
-    activateSection(0);
+    activateSection(initialSection());
     refreshStatus();
+  }
+
+  /** Deep-link support: Policy Settings links elsewhere in the app (the
+      shared sidebar on Dashboard/Users/Audit Log) point straight at a
+      section via ?sec=N so admins don't have to land on section 0 and
+      re-click. */
+  function initialSection() {
+    var m = /[?&]sec=(\d+)/.exec(location.search);
+    var i = m ? +m[1] : 0;
+    return (i >= 0 && i <= SECTIONS.length) ? i : 0;
   }
 
   function activateSection(i) {
     document.querySelectorAll('.adm-sec').forEach(function (n, idx) {
       n.classList.toggle('active', idx === i);
     });
-    document.querySelectorAll('.nav-item').forEach(function (btn) {
+    // scoped to [data-sec]: the sidebar also carries plain page-to-page
+    // nav links (Dashboard, Users, ...) that share the .nav-item look but
+    // aren't part of this in-page section router
+    document.querySelectorAll('.nav-item[data-sec]').forEach(function (btn) {
       btn.classList.toggle('active', +btn.dataset.sec === i);
       if (+btn.dataset.sec === i) {
         el('page-title').textContent = btn.querySelector('.nav-txt').textContent;
@@ -255,7 +271,7 @@
   }
 
   function wireNav() {
-    document.querySelectorAll('.nav-item').forEach(function (btn) {
+    document.querySelectorAll('.nav-item[data-sec]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         activateSection(+btn.dataset.sec);
         el('sidebar').classList.remove('open');
@@ -266,12 +282,26 @@
       el('sidebar').classList.toggle('open');
     });
   }
+  var hasOverridesOnServer = !!window.__DSR_CONFIG_OVERRIDES;
   function refreshStatus() {
-    var has = false;
-    try { has = !!localStorage.getItem(E.CONFIG_KEY); } catch (e) {}
-    el('adm-status').innerHTML = has
+    el('adm-status').innerHTML = hasOverridesOnServer
       ? '<span class="chip ovr">CUSTOM SETTINGS ACTIVE</span> saved overrides are applied on top of the Excel defaults.'
       : '<span class="chip def">EXCEL DEFAULTS</span> no overrides saved - the system runs on the master Excel values.';
+  }
+
+  /** POST the overrides (or {} to clear them) to the server; returns a Promise. */
+  function saveToServer(overrides) {
+    return fetch(window.__DSR_CONFIG_SAVE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csrf: window.__DSR_CSRF, config: overrides })
+    }).then(function (res) {
+      if (!res.ok) throw new Error('Server returned ' + res.status);
+      return res.json();
+    }).then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'Save failed');
+      return data;
+    });
   }
 
   document.addEventListener('input', function (ev) {
@@ -285,8 +315,10 @@
       if (mv != null) obj[t.dataset.key] = mv;
     } else if (t.dataset.mx) {
       var g = gridOf(t.dataset.mx);
-      var n = parseNum(t.value);
-      g[+t.dataset.r][+t.dataset.c] = t.value.trim() === '' ? null : n;
+      var n = parseNum(t.value);           // typed as a percent, 2dp (e.g. 13.50)
+      // store back as the fraction the engine expects (13.50 -> 0.135),
+      // rounded to strip float noise from the /100 division
+      g[+t.dataset.r][+t.dataset.c] = n == null ? null : Math.round((n / 100) * 1e6) / 1e6;
       matricesDirty = true;
     }
   });
@@ -298,17 +330,17 @@
     return out;
   }
   el('btn-save').onclick = function () {
-    try {
-      localStorage.setItem(E.CONFIG_KEY, JSON.stringify(overridesSnapshot()));
-      el('save-msg').textContent = 'Saved. Reload the calculator page to apply.';
+    saveToServer(overridesSnapshot()).then(function () {
+      hasOverridesOnServer = true;
+      el('save-msg').textContent = 'Saved. Applies to every user on their next page load.';
       setTimeout(function () { el('save-msg').textContent = ''; }, 4000);
       refreshStatus();
-    } catch (e) { alert('Could not save: ' + e.message); }
+    }).catch(function (e) { alert('Could not save: ' + e.message); });
   };
   el('btn-reset').onclick = function () {
     if (!confirm('Remove ALL custom settings and restore the master Excel defaults?')) return;
-    try { localStorage.removeItem(E.CONFIG_KEY); } catch (e) {}
-    location.reload();
+    saveToServer({}).then(function () { location.reload(); })
+      .catch(function (e) { alert('Could not reset: ' + e.message); });
   };
   el('btn-export').onclick = function () {
     var blob = new Blob([JSON.stringify(overridesSnapshot(), null, 2)], { type: 'application/json' });
@@ -324,11 +356,10 @@
     if (!f) return;
     f.text().then(function (txt) {
       var obj = JSON.parse(txt);
-      localStorage.setItem(E.CONFIG_KEY, JSON.stringify(obj));
-      location.reload();
-    }).catch(function (e) { alert('Could not import: ' + e.message); });
+      return saveToServer(obj);
+    }).then(function () { location.reload(); })
+      .catch(function (e) { alert('Could not import: ' + e.message); });
   };
-  el('btn-open-calc').onclick = function () { location.href = 'index.html'; };
 
   renderAll();
 })();

@@ -17,7 +17,7 @@
   };
 
   /* All policy numbers read from the central config at call time, so
-     admin.html overrides apply without touching this logic. */
+     admin/settings.php overrides apply without touching this logic. */
   function CFG() { return window.Engine.CONFIG; }
 
   /** Home Financing DSR threshold (fraction), income-banded.

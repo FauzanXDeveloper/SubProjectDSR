@@ -107,59 +107,138 @@
     ], 3));
   }
 
-  function incomeHtml() {
-    var c = App.computed;
-    return section('Income', figures([
-      ['Gross Income', fmt(c.grossIncome), 'accent'],
-      ['Net Income', fmt(c.netIncome), 'good']
-    ]));
+  /** Month-by-month payslip table (Total = raw sum, Average = the actual
+      recognised figure per column - MAX for Basic/Other, AVERAGEIF>0 for
+      Fixed/OT, sum/6 for Commission, matching calcNormalManual exactly, so
+      the row genuinely reconciles into the buildup below it. */
+  function incomeMonthsTableHtml() {
+    var s = App.state, c = App.computed, inc = c.income;
+    var months = s.income.manualMonths || [];
+    var cols = [
+      ['basic', 'Basic Income'], ['fixedAllowance', 'Fixed Allowance'],
+      ['fixedAllowanceDesc', 'Fixed Allowance Desc'], ['other', 'Other Income'],
+      ['commission', 'Commission Income'], ['ot', 'OT'],
+      ['epf', 'EPF'], ['pcb', 'PCB / Zakat'], ['socso', 'SOCSO']
+    ];
+    var head = cols.map(function (c2) { return c2[1]; });
+    var body = months.map(function (m, i) {
+      return '<tr><td>Month ' + (i + 1) + '</td>' + cols.map(function (c2) {
+        return c2[0] === 'fixedAllowanceDesc'
+          ? '<td>' + esc(dash(m[c2[0]])) + '</td>'
+          : '<td class="num">' + esc(num(m[c2[0]]) ? fmt(num(m[c2[0]])) : '-') + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    function colSum(key) { return months.reduce(function (a, m) { return a + num(m[key]); }, 0); }
+    var totalRow = '<tr class="rep-total"><td>Total</td>' + cols.map(function (c2) {
+      return c2[0] === 'fixedAllowanceDesc' ? '<td></td>' : '<td class="num">' + fmt(colSum(c2[0])) + '</td>';
+    }).join('') + '</tr>';
+    // the recognised ("Average") figure per column - the same one the
+    // engine actually uses, not a naive arithmetic mean of all 6 months
+    var recognised = {
+      basic: inc.basicRecog, fixedAllowance: inc.avgFixed, other: inc.avgOther,
+      commission: inc.avgComm, ot: inc.avgOT,
+      epf: inc.avgEPF, pcb: inc.avgPCB, socso: inc.avgSocso
+    };
+    var avgRow = '<tr class="rep-total"><td>Average</td>' + cols.map(function (c2) {
+      return c2[0] === 'fixedAllowanceDesc' ? '<td></td>' : '<td class="num">' + fmt(recognised[c2[0]] || 0) + '</td>';
+    }).join('') + '</tr>';
+    return '<div class="rep-prod-h">Income for ' + esc(dash(s.customer.name)) + '</div>' +
+      '<div class="rep-tbl-wrap"><table class="rep-tbl"><thead><tr><th></th>' +
+      head.map(function (h) { return '<th class="num">' + esc(h) + '</th>'; }).join('') +
+      '</tr></thead><tbody>' + body + totalRow + avgRow + '</tbody></table></div>';
   }
 
-  function commitmentsHtml(mode) {
+  /** Gross -> Net buildup, matching the recognised-income arithmetic exactly
+      (NORMAL/manual only - EPF and BIZMAN modes use their own dl() summary
+      since their formulas don't share this same shape). */
+  function incomeBuildupHtml() {
+    var c = App.computed, inc = c.income;
+    return dl([
+      ['(+) Basic + Fixed Allowance', fmt(inc.basicRecog + inc.avgFixed)],
+      ['(+) Other Income', fmt(inc.avgOther)],
+      ['(+) Commission (60%)', fmt(inc.average60Comm)],
+      ['(+) OT', fmt(inc.avgOT)],
+      ['(=) Gross Income', fmt(c.grossIncome)],
+      ['(-) EPF + PCB/Zakat', fmt(inc.average60EPF + inc.avgPCB)],
+      ['(-) Socso', fmt(inc.avgSocso)],
+      ['(=) Net Income', fmt(c.netIncome)]
+    ], 2);
+  }
+
+  function incomeHtml() {
     var s = App.state, c = App.computed;
-    var newInst = totalNewInstalment(mode);
-    var inclNew = (c.grandTotal || 0) + newInst;            // existing + our new facility
-    var ndiAfter = (c.netIncome || 0) - inclNew;
-    var html = figures([
-      ['Net Existing', fmt(c.grandTotal), 'accent'],
-      ['Total + New', fmt(inclNew), 'accent'],
-      ['NDI (After New)', fmt(ndiAfter), ndiAfter > 0 ? 'good' : 'accent']
-    ]);
-    // compact CCRIS listing (decision-relevant lines only)
-    var rows = (s.ccris || []).filter(function (r) {
+    var isManualNormal = s.customer.type !== 'BIZMAN' && s.income.normalMode !== 'EPF';
+    // No top-line Gross/Net tiles here - they're redundant with the
+    // buildup's own "(=) Gross Income" / "(=) Net Income" rows below, and
+    // with the Financing section's own figures for non-manual modes.
+    var html = isManualNormal
+      ? incomeMonthsTableHtml() + '<div style="margin-top:10px">' + incomeBuildupHtml() + '</div>'
+      : figures([
+          ['Gross Income', fmt(c.grossIncome), 'accent'],
+          ['Net Income', fmt(c.netIncome), 'good']
+        ]);
+    return section('Income', html);
+  }
+
+  /** Full-detail CCRIS table (No/Date/Capacity/.../Stress Test Commitment),
+      mirroring the on-screen Step B table so the report never needs a
+      second, thinner source of truth. */
+  function ccrisTableHtml() {
+    var s = App.state, c = App.computed;
+    var dataRows = (s.ccris || []).filter(function (r) {
       return String(r.facility || '').trim() !== '';
     }).map(function (r, i) {
       var lc = E.lineCommitment(r, s.customer.cardType);
-      return { cells: [String(i + 1) + '. ' + (r.facility || '-'),
-        fmt(num(r.outstanding)), fmt(num(r.limit)), fmt(lc.commitment)] };
+      var floating = String(r.floating || '').toUpperCase() === 'YES';
+      var stress = E.stressCommitment(lc.commitment, floating, E.stressFactorFor(r));
+      return { cells: [
+        String(i + 1), dash(r.date), dash(r.capacity), dash(r.collateral), dash(r.facility),
+        fmt(num(r.outstanding)), fmt(num(r.limit)), dash(r.legalStatus),
+        r.override !== '' && r.override != null ? fmt(num(r.override)) : '-',
+        fmt(lc.commitment), floating ? 'Yes' : 'No', fmt(stress)
+      ] };
     });
-    if (rows.length) {
-      rows.push({ _total: true, cells: ['Total', '', '', fmt(c.totalCommitment)] });
-      html += '<div class="rep-tbl-wrap">' +
-        tableRows(['CCRIS Facility', 'Outstanding (RM)', 'Limit (RM)', 'Monthly (RM)'], rows) + '</div>';
-    }
-    return section('Commitments', html);
+    if (!dataRows.length) return '<p class="rep-empty">No CCRIS records captured.</p>';
+    var head = ['No', 'Date', 'Capacity', 'Collateral', 'Facility', 'Outstanding (RM)', 'Limit (RM)',
+      'Legal Status', 'Override (RM)', 'Commitment (RM)', 'Floating Rate', 'Stress Test Commitment (RM)'];
+    var th = head.map(function (h, i) { return '<th' + (i ? ' class="num"' : '') + '>' + esc(h) + '</th>'; }).join('');
+    var body = dataRows.map(function (r) {
+      return '<tr>' + r.cells.map(function (c2, i) {
+        return '<td' + (i ? ' class="num"' : '') + '>' + esc(c2) + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    // deduction + total rows, colspan-aligned like the on-screen CCRIS table
+    body += '<tr><td colspan="9">Deduct Balance Transfer Commitment</td>' +
+      '<td class="num">(' + esc(fmt(c.btTotal)) + ')</td><td colspan="2"></td></tr>';
+    body += '<tr class="rep-total"><td colspan="9">TOTAL</td>' +
+      '<td class="num">' + esc(fmt(c.grandTotal)) + '</td><td></td>' +
+      '<td class="num">' + esc(fmt(c.stressTotal)) + '</td></tr>';
+    return '<div class="rep-tbl-wrap"><table class="rep-tbl"><thead><tr>' + th + '</tr></thead>' +
+      '<tbody>' + body + '</tbody></table></div>';
   }
 
-  /** Sum of the monthly instalments for every facility requested in this mode,
-      used for the "existing + new" and NDI-after figures. */
-  function totalNewInstalment(mode) {
-    var s = App.state, tot = 0;
-    if (mode.indexOf('pf') !== -1) {
-      if (mode === 'pf-hf' && (s.pf.apps || []).length) {
-        (s.pf.apps || []).forEach(function (a) { tot += App.computePFApp(a).instalment; });
-      } else if (mode !== 'pf-hf') { tot += App.computePF().instalment; }
-    }
-    if (mode.indexOf('hf') !== -1) {
-      var hf = App.computeHF();
-      tot += hf.ctf !== 0 ? hf.ctf : hf.instalment;
-    }
-    if (mode.indexOf('cc') !== -1) {
-      if (mode === 'hf-cc' && (s.cc.cards || []).length) {
-        (s.cc.cards || []).forEach(function (card) { tot += App.computeCCCard(card).active.monthlyInstallment; });
-      } else if (mode !== 'hf-cc') { tot += App.computeCC().active.monthlyInstallment; }
-    }
-    return tot;
+  /** Balance Transfer / settlement rows, as their own small table under the
+      CCRIS listing - the deduction feeding the CCRIS TOTAL above. */
+  function balanceTransferHtml() {
+    var s = App.state;
+    var rows = (s.bt || []).filter(function (r) {
+      return num(r.outstanding) > 0 || num(r.repayment) > 0;
+    }).map(function (r, i) {
+      var repayment = r.type === 'BT' ? E.btRepayment(num(r.outstanding)) : num(r.repayment);
+      return { cells: [String(i + 1),
+        r.type === 'BT' ? fmt(num(r.outstanding)) : '-',
+        fmt(repayment)] };
+    });
+    if (!rows.length) return '';
+    return '<div class="rep-tbl-wrap" style="margin-top:10px">' +
+      '<div class="rep-prod-h">Balance Transfer</div>' +
+      tableRows(['No', 'Amount (RM)', 'Minimum Payment (RM)'], rows) + '</div>';
+  }
+
+  function commitmentsHtml() {
+    // No top-line summary tiles - the CCRIS table's own TOTAL row and the
+    // Financing section's "Existing Commitment" cover the same figures.
+    return section('Commitments', ccrisTableHtml() + balanceTransferHtml());
   }
 
   /* ---- per-product decision blocks ---- */
@@ -194,6 +273,29 @@
         ['Instalment (1%)', fmt(res.active.monthlyInstallment)]
       ], 3) + '</div>';
   }
+  /** Full PF financing detail (standalone PF only - computePF() carries the
+      Current/After-BT/stress figures that computePFApp doesn't). Same
+      fields as the evaluation memo, styled with our own report components. */
+  function pfFinancingDetailHtml(r) {
+    return '<div class="rep-prod">' +
+      '<div class="rep-prod-h">Financing</div>' +
+      dl([
+        ['Current DSR', pct(r.currentDSR, DP)],
+        ['Existing Commitment', fmt(App.computed.grandTotal)],
+        ['Financing Requested', fmt(num(App.state.pf.amount))],
+        ['Tenure (Month)', num(App.state.pf.tenureMonths) || '-'],
+        ['Profit Rate', r.rateFrac != null ? pct(r.rateFrac, 2) : '-'],
+        ['Instalment', fmt(r.instalment)],
+        ['New Commitment', fmt(r.newCommitment)],
+        ['Net Disposable Income (NDI)', fmt(r.ndi)],
+        ['New DSR', pct(r.newDSR, DP)],
+        ['Stress Test Combined Instalment', fmt(r.stressCommit)],
+        ['Stress Net Disposable Income (Stress NDI)', fmt(r.stressNdi)],
+        ['Stress Test DSR (%)', pct(r.stressDSR, DP)],
+        ['New Commitment Unsecured', fmt(r.unsecCommit)],
+        ['New DSR Unsecured (%)', pct(r.unsecDSR, DP)]
+      ], 2) + '</div>';
+  }
 
   function productsHtml(mode) {
     var s = App.state;
@@ -207,7 +309,7 @@
             'Personal Financing - ' + applicantLabel(a.applicant), a.amount, a.tenureMonths);
         });
       } else if (mode !== 'pf-hf') {
-        blocks += pfBlock(App.computePF(), 'Personal Financing', s.pf.amount, s.pf.tenureMonths);
+        blocks += pfFinancingDetailHtml(App.computePF());
       }
     }
     // HF
@@ -303,6 +405,16 @@
       '</div>');
   }
 
+  /** Decision watermark - only meaningful once a checker has actually
+      decided (App.printReport already blocks printing before both
+      signatures exist, so by the time this runs the status is settled). */
+  function stampHtml() {
+    var caseInfo = window.__DSR_CASE;
+    if (!caseInfo || (caseInfo.status !== 'approved' && caseInfo.status !== 'rejected')) return '';
+    return '<div class="rep-stamp ' + caseInfo.status + '">' +
+      (caseInfo.status === 'approved' ? 'APPROVED' : 'REJECTED') + '</div>';
+  }
+
   /* ============================================================
      BUILD + PRINT
      ============================================================ */
@@ -319,10 +431,11 @@
       return;
     }
     host.innerHTML =
+      stampHtml() +
       headerHtml(mode) +
       applicantHtml() +
+      commitmentsHtml() +
       incomeHtml() +
-      commitmentsHtml(mode) +
       productsHtml(mode) +
       decisionHtml(mode) +
       signoffHtml() +
@@ -334,6 +447,15 @@
   };
 
   App.printReport = function () {
+    var so = App.state.signoff;
+    if (!so.makerSignature || !so.checkerSignature) {
+      App.modal.alert(
+        'This case cannot be printed yet - both the Maker and Checker must sign off first. ' +
+        'Submit the case to a checker, then wait for their Approve/Reject decision (which captures their signature).',
+        { type: 'error' }
+      );
+      return;
+    }
     App.buildPrintReport();
     // let the DOM paint the freshly built report before the print dialog opens
     window.requestAnimationFrame(function () {

@@ -1,20 +1,22 @@
 /* ============================================================
    format.js - display formatting for numeric inputs.
-   Inputs carry data-fmt="money" | "pct" | "int":
+   Inputs carry data-fmt="money" | "pct" | "int" | "ic":
      money -> 1,234,567.89   pct -> 4.25%   int -> 1,234
-   Focus shows the raw number for editing; blur (or Enter)
-   formats it and pushes the value through the normal input
-   pipeline. All engine num() parsers strip commas/% so the
-   formatted strings stay calculation-safe.
+     ic    -> 900101-01-5566 (Malaysian IC, via Engine.formatIC)
+   Focus shows the raw value for editing; blur (or Enter) formats
+   it and pushes the value through the normal input pipeline. All
+   engine num() parsers strip commas/%/dashes so the formatted
+   strings stay calculation-safe.
    ============================================================ */
 (function () {
   'use strict';
   var App = window.App = window.App || {};
 
-  function raw(v) { return String(v == null ? '' : v).replace(/[,\s%]/g, ''); }
+  function raw(v) { return String(v == null ? '' : v).replace(/[,\s%-]/g, ''); }
 
   /** Format a stored value for display inside an input. */
   function fmtInput(v, kind) {
+    if (kind === 'ic') return window.Engine ? window.Engine.formatIC(v) : String(v == null ? '' : v);
     var r = raw(v);
     if (r === '') return '';
     var n = parseFloat(r);

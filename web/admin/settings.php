@@ -1,11 +1,21 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__ . '/../../app/bootstrap.php';
+
+$__user = Auth::requireLogin();
+Rbac::requireRole($__user, ['admin']);
+
+$__overrides = PolicyConfig::overrides();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin - Calculation Settings | ARBM DSR Calculator</title>
-<link rel="icon" type="image/png" href="public/favicon.png">
-<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" type="image/png" href="../public/favicon.png">
+<link rel="stylesheet" href="../css/styles.css">
+<link rel="stylesheet" href="../css/app.css">
 <style>
   /* one settings section visible at a time (sidebar-routed) */
   .adm-sec { display: none; }
@@ -43,11 +53,30 @@
   <nav class="sidebar no-print" id="sidebar">
     <div class="brand" style="flex-direction:column;align-items:flex-start;gap:8px;">
       <span class="brand-logo">
-        <img class="logo-full" src="public/white_logo_alrajhi.png" alt="Al Rajhi Bank">
-        <img class="logo-mark" src="public/favicon.png" alt="Al Rajhi Bank">
+        <img class="logo-full" src="../public/white_logo_alrajhi.png" alt="Al Rajhi Bank">
+        <img class="logo-mark" src="../public/favicon.png" alt="Al Rajhi Bank">
       </span>
       <div class="t2">Calculation Settings (Admin)</div>
     </div>
+
+    <div class="sidebar-scroll">
+    <div class="group-label">Navigation</div>
+    <a class="nav-item" href="/dashboard.php">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      <span class="nav-txt">Dashboard</span>
+    </a>
+    <a class="nav-item" href="/admin/index.php">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 3 6v6c0 5 3.8 8.7 9 10 5.2-1.3 9-5 9-10V6l-9-4Z"/></svg>
+      <span class="nav-txt">Admin Dashboard</span>
+    </a>
+    <a class="nav-item" href="/admin/users.php">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6"/><path d="M16 8.5a3 3 0 1 0 0-6"/><path d="M18.5 14.3c2 .7 3.5 2.7 3.5 5.2"/></svg>
+      <span class="nav-txt">Users</span>
+    </a>
+    <a class="nav-item" href="/admin/audit.php">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11"/></svg>
+      <span class="nav-txt">Audit Log</span>
+    </a>
 
     <div class="group-label">Policy Settings</div>
     <button class="nav-item" data-sec="0" title="Customer Class">
@@ -82,12 +111,18 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
       <span class="nav-txt">PF Pricing Matrices</span>
     </button>
+    </div>
 
     <div class="foot">
-      <button id="btn-open-calc" type="button" title="Open Calculator">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2.5" width="16" height="19" rx="2"/><path d="M8 7h8M8 11h3M13 11h3M8 15h3M13 15h3"/></svg>
-        <span class="nav-txt">Open Calculator</span>
-      </button>
+      <div class="user-chip"><?= e($__user['name']) ?> &middot; admin</div>
+      <a href="/change_password.php" title="Change password">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
+        <span class="nav-txt">Change password</span>
+      </a>
+      <a href="/logout.php" title="Logout">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        <span class="nav-txt">Logout</span>
+      </a>
       <button id="btn-export" type="button" title="Export settings (JSON)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
         <span class="nav-txt">Export settings (JSON)</span>
@@ -116,9 +151,9 @@
       <div class="adm-status" id="adm-status"></div>
     </div>
 
-    <div class="notice">Changes apply to <b>this browser only</b> and take effect when the calculator
-    page is next loaded or refreshed. Use Export / Import JSON to move settings to another machine.
-    Reset restores every value to the master Excel defaults.</div>
+    <div class="notice">Changes are saved to the database and apply to <b>every user</b> once saved -
+    they take effect the next time the calculator page loads. Reset restores every value to the
+    master Excel defaults.</div>
 
     <div id="adm-sections"></div>
 
@@ -130,9 +165,16 @@
   </main>
 </div>
 
+<!-- server-injected: policy overrides (replaces the old localStorage copy),
+     CSRF token and save endpoint for js/admin.js -->
+<script>
+  window.__DSR_CONFIG_OVERRIDES = <?= $__overrides ? json_encode($__overrides) : 'null' ?>;
+  window.__DSR_CSRF = <?= json_encode(Csrf::token()) ?>;
+  window.__DSR_CONFIG_SAVE_URL = '/api/config_save.php';
+</script>
 <!-- config first, then the data the matrix editor needs -->
-<script src="js/engine/config.js"></script>
-<script src="data/ndiPricing.js"></script>
-<script src="js/admin.js"></script>
+<script src="../js/engine/config.js"></script>
+<script src="../data/ndiPricing.js"></script>
+<script src="../js/admin.js"></script>
 </body>
 </html>

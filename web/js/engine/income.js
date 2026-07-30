@@ -70,7 +70,7 @@
 
   // Fraction of the variable EPF component recognised as income (official
   // "EPF Income Calculation" workbook E6 = 0.6). A policy constant - never a
-  // user input, never shown in the UI - but tunable via admin.html.
+  // user input, never shown in the UI - but tunable via admin/settings.php.
   function epfVariableRecognition() { return CFG().epfVariablePct / 100; }
 
   /**

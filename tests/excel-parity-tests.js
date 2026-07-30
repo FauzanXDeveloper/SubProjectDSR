@@ -16,9 +16,9 @@
   if (typeof window === 'undefined') {
     global.window = global;
     var path = require('path');
-    ['../js/engine/config.js', '../js/engine/pmt.js', '../js/engine/facilityRates.js',
-     '../js/engine/ccrisLine.js', '../js/engine/income.js',
-     '../js/engine/dsrThresholds.js', '../data/ndiPricing.js'
+    ['../web/js/engine/config.js', '../web/js/engine/pmt.js', '../web/js/engine/facilityRates.js',
+     '../web/js/engine/ccrisLine.js', '../web/js/engine/income.js',
+     '../web/js/engine/dsrThresholds.js', '../web/data/ndiPricing.js'
     ].forEach(function (f) { require(path.join(__dirname, f)); });
   }
   var E = window.Engine;
