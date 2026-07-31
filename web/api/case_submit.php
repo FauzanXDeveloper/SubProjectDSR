@@ -44,3 +44,19 @@ $id = Cases::submit((int) $user['id'], $checkerId, $mode, $snapshot);
 $case = Cases::find($id);
 
 Http::jsonOut(['ok' => true, 'id' => $id, 'reference' => $case['reference']]);
+
+/*
+ * WHAT THIS FILE DOES (in plain language)
+ * ----------------------------------------
+ * A backend "API" endpoint used when a preparer finishes a calculation
+ * and submits a brand-new case for a checker to review. The calculator
+ * page calls this quietly when the "Submit" button is clicked.
+ *
+ * Steps: confirm the caller is logged in, has the "normal" (preparer)
+ * role, and isn't forced to change their password first. Then check
+ * the anti-forgery token, validate the financing "mode" (e.g. PF, HF,
+ * CC, or a combination), confirm a valid active checker was chosen,
+ * and confirm the customer's name and IC number were entered. If all
+ * checks pass, Cases::submit() creates the case record and this page
+ * replies with the new case's ID and reference number.
+ */

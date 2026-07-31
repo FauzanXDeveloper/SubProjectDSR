@@ -81,3 +81,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 </body>
 </html>
+<?php
+/*
+ * WHAT THIS PAGE DOES (in plain language)
+ * ----------------------------------------
+ * This is the "change my password" screen. It's shown either because
+ * the user chose to update their password, or because an admin flagged
+ * their account as needing a mandatory password change before they can
+ * do anything else (e.g. right after account creation).
+ *
+ * - On submit, it checks the anti-forgery token, verifies the current
+ *   password is correct, and makes sure the new password is at least
+ *   8 characters, matches its confirmation field, and is actually
+ *   different from the old one.
+ * - If everything checks out, Auth::changePassword() saves the new
+ *   password and the page shows a success message with a link to the
+ *   dashboard. If a mandatory change was in effect, that flag is
+ *   cleared so the user isn't asked again.
+ * - If anything fails validation, the form is redisplayed with an
+ *   explanation of what needs fixing.
+ */

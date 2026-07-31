@@ -82,3 +82,23 @@ include __DIR__ . '/../partials/header.php';
   </div>
 </div>
 <?php include __DIR__ . '/../partials/footer.php'; ?>
+<?php
+/*
+ * WHAT THIS PAGE DOES (in plain language)
+ * ----------------------------------------
+ * This is the full Audit Log - an admin-only page that lists every
+ * tracked security-relevant event in the system: logins, user account
+ * changes, case submissions/decisions, and policy-setting changes.
+ *
+ * - It reads optional filters from the URL (which user did it, which
+ *   action, and a date range) and passes them to Audit::search() to
+ *   fetch a filtered, paginated (50 rows per page) list of events.
+ * - The dropdowns at the top let the admin narrow results down to one
+ *   user or one type of action; the page reloads with new filters
+ *   whenever "Filter" is clicked, and "Reset" clears them.
+ * - Each row in the table shows when an event happened, who did it,
+ *   what the action was, what it was done to, extra details, and the
+ *   IP address it came from.
+ * - Page numbers at the bottom let the admin browse through older
+ *   history beyond the first 50 results.
+ */

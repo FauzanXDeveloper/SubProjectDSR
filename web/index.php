@@ -242,3 +242,43 @@ $overrides = PolicyConfig::overrides();
 <script src="js/caseSync.js"></script>
 </body>
 </html>
+<?php
+/*
+ * WHAT THIS PAGE DOES (in plain language)
+ * ----------------------------------------
+ * This is the main calculator - the heart of the application. It's the
+ * page a "preparer" (normal user) uses to work out a customer's DSR
+ * (Debt Service Ratio) for Personal Financing, Home Financing, Credit
+ * Card, or a combination of these, and a checker/admin uses to review
+ * a case that's already been submitted.
+ *
+ * How it decides what to show:
+ * - If the URL includes a case ID (e.g. index.php?case=42), it loads
+ *   that saved case from the database and checks the current user is
+ *   allowed to view it. That saved data (customer info, CCRIS lines,
+ *   income, the chosen product mode, sign-off details, etc.) is then
+ *   handed to the page as read-only data for the checker/reviewer, or
+ *   as an editable in-progress case for its maker.
+ * - If there's no case ID and the user is an admin, they're redirected
+ *   to the dashboard - admins review cases, they don't run new ones.
+ * - If there's no case ID and the user is a preparer, this becomes a
+ *   fresh, blank calculator: they pick a financing mode from the
+ *   sidebar (PF, HF, CC, or a combo) and start entering customer,
+ *   CCRIS, and income details.
+ *
+ * How the calculation actually happens:
+ * - This page itself does NOT do any DSR math. It only prepares data
+ *   on the server (the logged-in user, policy config overrides, the
+ *   list of available checkers, and the case being viewed, if any)
+ *   and hands it to the browser via `window.__DSR_*` variables.
+ * - All the real number-crunching happens client-side in the /js/
+ *   files loaded at the bottom (config.js, pmt.js, income.js,
+ *   creditLimit.js, dsrThresholds.js, hfPricing.js, etc.) which read
+ *   what the user types in and compute affordability, limits, and the
+ *   DSR percentage live in the browser.
+ * - caseSync.js then talks to the api/*.php endpoints in the
+ *   background to save drafts, submit cases, or record a checker's
+ *   decision, without reloading the page.
+ * - The print/export button uses report.js to build a clean printable
+ *   summary of the whole evaluation.
+ */

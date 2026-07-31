@@ -88,3 +88,19 @@ include __DIR__ . '/partials/header.php';
   </div>
 </div>
 <?php include __DIR__ . '/partials/footer.php'; ?>
+<?php
+/*
+ * WHAT THIS PAGE DOES (in plain language)
+ * ----------------------------------------
+ * This is the landing page after login - a personal summary screen.
+ *
+ * - It loads every case the logged-in user is allowed to see
+ *   (Cases::listForUser), which differs by role: a preparer sees their
+ *   own submissions, a checker sees cases routed to them, an admin
+ *   sees everything.
+ * - It counts how many cases are drafts, pending review, approved, or
+ *   rejected, and shows those counts as small stat tiles at the top.
+ * - It then lists the 8 most recent cases in a table, with a link to
+ *   open each one and a link to see the full case list.
+ * - Nothing here is calculated or saved - it's a read-only overview.
+ */

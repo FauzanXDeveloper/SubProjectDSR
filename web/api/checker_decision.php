@@ -41,3 +41,19 @@ try {
 }
 
 Http::jsonOut(['ok' => true]);
+
+/*
+ * WHAT THIS FILE DOES (in plain language)
+ * ----------------------------------------
+ * A backend "API" endpoint used when a checker approves or rejects a
+ * submitted case. The cases page calls this behind the scenes when the
+ * checker clicks "Approve" or "Reject".
+ *
+ * Steps: confirm the caller is logged in with the "checker" role,
+ * check the anti-forgery token, and make sure the decision is either
+ * "approved" or "rejected" (rejections must include a reason/notes).
+ * It also collects the checker's sign-off details (name, ID, date,
+ * signature) if provided. Finally it calls Cases::decide() to record
+ * the outcome, replying with an error if the case can't be decided
+ * right now (e.g. someone else already decided it).
+ */

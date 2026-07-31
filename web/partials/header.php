@@ -153,3 +153,27 @@ function navActive(string $key, string $active): string
       </div>
     </div>
     <div class="app-shell">
+<?php
+/*
+ * WHAT THIS FILE DOES (in plain language)
+ * ----------------------------------------
+ * This is not a page by itself - it's the shared "frame" that every
+ * server-rendered page (dashboard, cases, admin pages, etc.) includes
+ * at the top, so they all look and behave consistently. The
+ * calculator page (index.php) has its own separate sidebar and does
+ * not use this file.
+ *
+ * - It prints the page's <head> (title, stylesheets) and opens the
+ *   overall page layout.
+ * - It builds the left-hand navigation sidebar, and changes which
+ *   links appear based on the logged-in user's role: a preparer sees
+ *   shortcuts straight into the calculator, a checker sees "My Queue",
+ *   and an admin sees the Admin Dashboard, Users, Audit Log, and every
+ *   Policy Settings section.
+ * - It highlights whichever nav link matches the current page (via the
+ *   $activeNav variable each page sets before including this file).
+ * - It opens the <main> content area and a top bar with the page title
+ *   and a mobile menu button - the actual page content is written by
+ *   whichever page included this file, and partials/footer.php closes
+ *   everything back up afterwards.
+ */

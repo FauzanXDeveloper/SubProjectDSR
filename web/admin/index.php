@@ -201,3 +201,23 @@ include __DIR__ . '/../partials/header.php';
   </div>
 </div>
 <?php include __DIR__ . '/../partials/footer.php'; ?>
+<?php
+/*
+ * WHAT THIS PAGE DOES (in plain language)
+ * ----------------------------------------
+ * This is the Admin Dashboard - a bank-wide reporting screen that only
+ * admins can see. It doesn't let anyone edit anything; it's purely
+ * statistics about how the whole system is being used.
+ *
+ * - It counts how many cases exist in total and by status (approved,
+ *   rejected, pending checker, draft) for the top stat tiles.
+ * - It groups cases "by maker" (who prepared them) and "by checker"
+ *   (who approved/rejected them) to show each person's approval rate.
+ * - It builds a "cases by day" chart for a date range the admin can
+ *   pick (last 7/14/30/90 days, or a custom from/to), showing how many
+ *   cases landed in each status each day.
+ * - It shows the 10 most recent entries from the audit log (a record
+ *   of who did what and when), with a link to the full log.
+ * - All the actual chart drawing is delegated to helper functions in
+ *   partials/charts.php.
+ */

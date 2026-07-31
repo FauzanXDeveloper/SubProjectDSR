@@ -73,3 +73,23 @@ include __DIR__ . '/partials/header.php';
   </div>
 </div>
 <?php include __DIR__ . '/partials/footer.php'; ?>
+<?php
+/*
+ * WHAT THIS PAGE DOES (in plain language)
+ * ----------------------------------------
+ * This is the full case list/queue - a more detailed version of the
+ * "recent cases" preview shown on the dashboard.
+ *
+ * - Admins are redirected away to the Admin Dashboard, since they get
+ *   their own oversight view instead of a personal queue.
+ * - It loads all cases the current user can see (Cases::listForUser),
+ *   and if a "status" filter is present in the URL (e.g. ?status=approved)
+ *   it narrows the list down to just that status.
+ * - The page title changes depending on role: "My Cases" for a
+ *   preparer, "My Queue" for a checker.
+ * - It renders a filter toolbar (All / Pending / Approved / Rejected)
+ *   and a table with full details per case: reference, customer, IC,
+ *   mode, gross income, DSR percentage, maker, checker, status
+ *   (including whether it was edited after submission), and the
+ *   submission date - each row links to open that case.
+ */

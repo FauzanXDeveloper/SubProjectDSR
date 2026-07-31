@@ -65,3 +65,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 </body>
 </html>
+<?php
+/*
+ * WHAT THIS PAGE DOES (in plain language)
+ * ----------------------------------------
+ * This is the sign-in screen for the DSR Calculator system.
+ *
+ * - If someone is already logged in, they're sent straight to the
+ *   dashboard instead of seeing this form again.
+ * - When the form is submitted, it checks the username/password are
+ *   filled in, verifies a hidden anti-forgery token (CSRF), and then
+ *   asks Auth::attempt() to check the credentials against the database.
+ * - On success, the user is redirected to the dashboard. On failure,
+ *   the same page is shown again with an error message explaining
+ *   what went wrong (e.g. wrong password, inactive account).
+ * - The bottom half of the file is just the HTML/CSS for the sign-in
+ *   box: logo, username field, password field, and a submit button.
+ */

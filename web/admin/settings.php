@@ -178,3 +178,30 @@ $__overrides = PolicyConfig::overrides();
 <script src="../js/admin.js"></script>
 </body>
 </html>
+<?php
+/*
+ * WHAT THIS PAGE DOES (in plain language)
+ * ----------------------------------------
+ * This is the "Calculation Settings" page - the control panel where an
+ * admin can tune the bank's policy numbers that drive the DSR
+ * calculator (customer class thresholds, financing limits, CCRIS
+ * commitment rules, income recognition rules, and PF pricing tables),
+ * without anyone needing to touch code.
+ *
+ * - It loads any existing overrides from the database
+ *   (PolicyConfig::overrides) and hands them to the browser so the
+ *   settings form starts pre-filled with whatever is currently active,
+ *   or the Excel-derived defaults if nothing's been overridden yet.
+ * - The sidebar switches between different settings sections (Customer
+ *   Class, Personal Financing, Home Financing, etc.) - only one is
+ *   shown on screen at a time, but "Save all settings" saves every
+ *   section together, not just the visible one.
+ * - Saving doesn't happen through a page reload - js/admin.js sends
+ *   the changes to api/config_save.php in the background. Those
+ *   changes apply system-wide, for every user, from their next page
+ *   load onward.
+ * - Export/Import buttons let an admin download the current settings
+ *   as a JSON file, or upload one to restore a previous configuration.
+ *   "Reset to Excel defaults" clears all overrides back to the
+ *   original master values.
+ */

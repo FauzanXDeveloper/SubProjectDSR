@@ -218,3 +218,28 @@ include __DIR__ . '/../partials/header.php';
   </div>
 </div>
 <?php include __DIR__ . '/../partials/footer.php'; ?>
+<?php
+/*
+ * WHAT THIS PAGE DOES (in plain language)
+ * ----------------------------------------
+ * This is the User Management page - admin-only, for creating and
+ * maintaining staff accounts (preparers, checkers, and other admins).
+ *
+ * - "New user" form: creates an account with a random temporary
+ *   password (shown once on screen so the admin can pass it on) and
+ *   flags the account so the new user is forced to change that
+ *   password the first time they log in. Username and staff ID are
+ *   validated with simple pattern checks, and duplicate usernames are
+ *   rejected.
+ * - The user table lets an admin, per account: edit the staff ID
+ *   inline, change the role (normal/checker/admin) via a dropdown that
+ *   saves instantly, enable/disable the account, and reset the
+ *   password (generating a new temporary one). An admin can't change
+ *   their own role or disable their own account, to avoid locking
+ *   themselves out.
+ * - Every one of these actions is recorded in the audit log
+ *   (Audit::log) so there's a trail of who changed what.
+ * - All actions are plain HTML form submissions (POST + a hidden
+ *   "action" field) - no JavaScript API calls are needed here, unlike
+ *   the calculator page.
+ */

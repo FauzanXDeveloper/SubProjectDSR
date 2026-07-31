@@ -113,3 +113,23 @@ function chart_daily_area(array $days, string $id = 'chart-daily'): string
     ];
     return chart_container($id, $opts);
 }
+
+/*
+ * WHAT THIS FILE DOES (in plain language)
+ * ----------------------------------------
+ * A small toolbox of chart-drawing helpers used only by the Admin
+ * Dashboard (admin/index.php) - not a page of its own.
+ *
+ * - chart_donut(): draws the "Case outcomes" donut (approved/rejected/
+ *   pending/draft split).
+ * - chart_checker_bar(): draws the horizontal bar chart of how many
+ *   cases each checker has approved vs. rejected.
+ * - chart_daily_area(): draws the "Cases by day" area chart showing
+ *   case volume over the selected date range, broken down by status.
+ *
+ * Each function takes plain PHP data the calling page already computed
+ * from the database, converts it into the JSON config ApexCharts (a
+ * JavaScript charting library loaded from web/vendor/apexcharts.min.js)
+ * expects, and prints a placeholder <div> plus a tiny inline <script>
+ * that draws the chart into it once the page loads.
+ */

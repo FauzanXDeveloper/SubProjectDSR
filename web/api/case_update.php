@@ -32,3 +32,17 @@ try {
 }
 
 Http::jsonOut(['ok' => true]);
+
+/*
+ * WHAT THIS FILE DOES (in plain language)
+ * ----------------------------------------
+ * A backend "API" endpoint used to save edits to a case that already
+ * exists (e.g. a preparer updating figures on a case still in
+ * progress). The calculator page calls this quietly in the background.
+ *
+ * Steps: confirm the caller is logged in and has the "normal"
+ * (preparer) role, check the anti-forgery token, make sure the
+ * customer's name and IC number are present, then pass everything to
+ * Cases::update() to save it. If the case can't be updated (e.g. it's
+ * already been decided), it replies with an error instead of crashing.
+ */
