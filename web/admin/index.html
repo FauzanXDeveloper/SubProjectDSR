@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard | ARBM DSR Calculator</title>
+<link rel="icon" type="image/png" href="/public/favicon.png">
+<link rel="stylesheet" href="/css/styles.css?v=20260828a">
+<link rel="stylesheet" href="/css/app.css?v=20260828a">
+<link rel="stylesheet" href="/css/dashboard.css?v=20260828a">
+<link rel="stylesheet" href="/css/theme-dark.css?v=20260828a">
+<script src="/js/theme.js?v=20260828a"></script>
+</head>
+<body>
+<script src="/vendor/apexcharts.min.js?v=20260828a"></script>
+<script src="/js/store/db.js?v=20260828a"></script>
+<script src="/js/store/audit.js?v=20260828a"></script>
+<script src="/js/store/auth.js?v=20260828a"></script>
+<script src="/js/store/rbac.js?v=20260828a"></script>
+<script src="/js/store/cases.js?v=20260828a"></script>
+<script src="/js/store/policyConfig.js?v=20260828a"></script>
+<!-- pure engine helpers, for the report-data SQL export card below: per-line
+     CCRIS commitments, PF matrix rates, HF term maths, CC limit eligibility -->
+<script src="/js/engine/config.js?v=20260828a"></script>
+<script src="/js/engine/pmt.js?v=20260828a"></script>
+<script src="/js/engine/age.js?v=20260828a"></script>
+<script src="/js/engine/facilityRates.js?v=20260828a"></script>
+<script src="/js/engine/ccrisLine.js?v=20260828a"></script>
+<script src="/js/engine/dsrThresholds.js?v=20260828a"></script>
+<script src="/js/engine/creditLimit.js?v=20260828a"></script>
+<script src="/js/engine/income.js?v=20260828a"></script>
+<script src="/js/engine/hfSummary.js?v=20260828a"></script>
+<script src="/data/ndiPricing.js?v=20260828a"></script>
+<!-- SQLite compiled to WebAssembly (sql.js, MIT) - builds the real .db
+     in the browser and runs the query box below -->
+<script src="/vendor/sql-wasm.js?v=20260828a"></script>
+<script src="/js/store/reportSql.js?v=20260828a"></script>
+<script src="/js/chrome.js?v=20260828a"></script>
+<script src="/js/charts.js?v=20260828a"></script>
+<script src="/js/pages/admin/dashboard.js?v=20260828a"></script>
+</body>
+</html>

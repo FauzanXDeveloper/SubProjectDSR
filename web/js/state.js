@@ -5,7 +5,7 @@
    object - never localStorage/sessionStorage. It reaches the server
    exactly once, on deliberate "Submit to Checker" (caseSync.js);
    resuming a submitted case re-populates it fresh from the DB on
-   each page load (web/index.php injects window.__DSR_CASE).
+   each page load (js/pages/calculator.js sets window.__DSR_CASE).
    ============================================================ */
 (function () {
   'use strict';

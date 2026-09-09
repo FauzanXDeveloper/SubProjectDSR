@@ -2,14 +2,16 @@
    config.js - central policy configuration.
 
    Every hard-coded policy number the engine uses lives HERE as a
-   default. admin/settings.php (admin-only) saves overrides to the
-   policy_config DB table; the PHP page injects them as
-   window.__DSR_CONFIG_OVERRIDES before this script runs, so the
-   calculator/editor always start from the server's current value -
-   no browser storage involved.
+   default. admin/settings.html (admin-only) saves overrides via
+   store/policyConfig.js into the browser's local JSON database, so
+   the calculator/editor always start from that database's current
+   value. store/db.js + store/policyConfig.js MUST be loaded before
+   this file wherever policy overrides matter (index.html,
+   admin/settings.html) - this file falls back to Excel defaults if
+   they weren't.
 
-   MUST be loaded BEFORE every other engine file (index.php,
-   admin/settings.php and the Node test bootstraps).
+   MUST be loaded BEFORE every other engine file (index.html,
+   admin/settings.html and the Node test bootstraps).
 
    The DEFAULTS below are the values from the master Excels - the
    parity tests run against them, so with no overrides saved the
@@ -114,8 +116,9 @@
 
   function loadOverrides() {
     try {
-      if (window.__DSR_TEST_DEFAULTS) return null;             // parity test page
-      return window.__DSR_CONFIG_OVERRIDES || null;            // injected by PHP (index.php / admin/settings.php)
+      if (window.__DSR_TEST_DEFAULTS) return null;              // parity test page
+      if (window.PolicyConfig) return PolicyConfig.overrides(); // store/policyConfig.js, backed by the local JSON database
+      return window.__DSR_CONFIG_OVERRIDES || null;             // fallback if store/policyConfig.js wasn't loaded first
     } catch (e) { return null; }                                // Node (tests): window is undefined
   }
 

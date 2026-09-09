@@ -73,14 +73,21 @@
   };
 
   function init() {
+    // The calculator shell may not be in the DOM at all: js/pages/calculator.js
+    // replaces document.body with a 403 message when access to a case is
+    // denied, but this DOMContentLoaded handler still fires regardless (it's
+    // registered by a static <script> tag that always loads). Bail out rather
+    // than throwing on the now-missing elements below.
+    if (!el('today-date')) return;
+
     // apply the mode from the URL hash BEFORE the first render, so a page
     // opened (or refreshed) directly on an HF page renders Step A's Product
     // field and Step B's joint applicant blocks straight away
     App.mode = currentModeFromHash();
 
-    el('today-date').textContent = 'Date: ' + new Date().toLocaleDateString('en-MY', {
-      day: '2-digit', month: 'long', year: 'numeric'
-    });
+    // always the Malaysian calendar day, not the browser's zone
+    el('today-date').textContent = 'Date: ' + new Date(Db.today() + 'T00:00:00Z').toLocaleDateString('en-MY',
+      { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
     // Some intake data is worth protecting before a mode switch. A switch never
     // deletes data (intake is shared across modes) but the officer may click a

@@ -17,7 +17,7 @@
   };
 
   /* All policy numbers read from the central config at call time, so
-     admin/settings.php overrides apply without touching this logic. */
+     admin/settings.html overrides apply without touching this logic. */
   function CFG() { return window.Engine.CONFIG; }
 
   /** Home Financing DSR threshold (fraction), income-banded.
@@ -135,12 +135,23 @@
   Engine.pfEligibilityGate = pfEligibilityGate;
 
   /* ---------- formatting helpers (shared) ---------- */
-  Engine.formatCurrency = function (v, dashZero) {
+  /** Bare amount, no currency prefix - for grids like CCRIS where the
+      whole table is ringgit and repeating "RM" on 8 cells per row is
+      noise. Figures stay right-aligned and tabular, so they read as one
+      column of money without being told so 40 times. */
+  Engine.formatAmount = function (v, dashZero) {
     var n = parseFloat(v);
     if (!isFinite(n) || (dashZero !== false && n === 0)) return '-';
-    return 'RM ' + n.toLocaleString('en-MY', {
+    return n.toLocaleString('en-MY', {
       minimumFractionDigits: 2, maximumFractionDigits: 2
     });
+  };
+  /** Amount with the RM prefix - for standalone figures (summary tiles,
+      verdict banners, the printed report) where there is no column header
+      to carry the unit. */
+  Engine.formatCurrency = function (v, dashZero) {
+    var a = Engine.formatAmount(v, dashZero);
+    return a === '-' ? a : 'RM ' + a;
   };
   Engine.formatPct = function (fraction, dp) {
     var n = parseFloat(fraction);

@@ -8,6 +8,7 @@
   var App = window.App = window.App || {};
   var E = window.Engine;
   var fmt = E.formatCurrency;
+  var amt = E.formatAmount;      // CCRIS grids: bare numbers, no RM
   var fmtPct = E.formatPct;
   // every DSR reading is shown to 2 dp; thresholds stay whole (fmtPct(x, 0))
   var DSR_DP = 2;
@@ -86,7 +87,7 @@
           (p.apps.length > 1 ? '<button class="row-del" data-pdel="' + i + '" title="Remove application" type="button">&times;</button>' : '') +
           '</div>' +
           '<div class="grid c3">' +
-          '<div class="field"><label>Financing Requested (RM)</label><input class="editable" data-pf="amount" type="text" inputmode="decimal" data-fmt="money" value="' + esc(a.amount) + '"></div>' +
+          '<div class="field"><label>Financing Requested</label><input class="editable" data-pf="amount" type="text" inputmode="decimal" data-fmt="money" value="' + esc(a.amount) + '"></div>' +
           '<div class="field"><label>Tenure (months)</label><input class="editable" data-pf="tenureMonths" type="text" inputmode="decimal" data-fmt="int" value="' + esc(a.tenureMonths) + '"></div>' +
           '<div class="field"><label>Profit Rate Deviation/Others (%)</label><input class="editable" data-pf="deviationPct" type="text" inputmode="decimal" data-fmt="pct" value="' + esc(a.deviationPct) + '"></div>' +
           '</div>' +
@@ -104,7 +105,7 @@
     // ---- PF standalone / PF + CC: single financing (main applicant) ----
     var body =
       '<div class="grid c3">' +
-      field('Financing Requested (RM)', 'pf-amount', p.amount) +
+      field('Financing Requested', 'pf-amount', p.amount) +
       field('Tenure (months)', 'pf-tenure', p.tenureMonths) +
       field('Profit Rate Deviation/Others (%)', 'pf-dev', p.deviationPct, { step: '0.01' }) +
       '<div class="field"><label>Experian Risk Rating (from iScore)</label>' +
@@ -556,20 +557,24 @@
       '<div class="subhead">CCRIS Records - Joint Applicant ' + k + '</div>' +
       '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
       '<th>No</th><th>Date</th><th>Capacity</th><th>Collateral</th><th>Facility</th>' +
-      '<th>Outstanding (RM)</th><th>Limit (RM)</th><th>Legal Status</th>' +
-      '<th>Instalment per<br>CCRIS (RM)</th><th>Override (RM)</th><th>Commitment (RM)</th><th>Source</th><th></th></tr></thead>' +
+      '<th>Outstanding</th><th>Limit</th><th>Legal Status</th>' +
+      '<th>Instalment per<br>CCRIS</th><th>Override</th><th>Commitment</th><th>Source</th><th></th></tr></thead>' +
       '<tbody data-hfjccris="' + k + '">' + hfJointCCRISRows(a, k) + '</tbody>' +
       '<tfoot><tr class="total-row"><td colspan="10">Total CCRIS Commitment</td>' +
       '<td class="num" id="hfj-total-' + k + '">-</td><td colspan="2"></td></tr></tfoot></table></div>' +
       '<div style="margin-top:8px"><button class="btn small secondary" data-hfj-addrow="' + k + '" type="button">+ Add CCRIS / other commitment row</button></div>' +
-      '<div class="subhead">Balance Transfer / Facilities To Be Settled - Joint Applicant ' + k + '</div>' +
-      '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
-      '<th>Type</th><th>Outstanding (RM)</th><th>Monthly Repayment (RM)</th><th></th>' +
-      '</tr></thead><tbody data-hfjbt="' + k + '">' + btRows + '</tbody>' +
-      '<tfoot><tr class="total-row"><td colspan="2">Total To Be Settled</td>' +
-      '<td class="num" id="hfj-bt-total-' + k + '">-</td><td></td></tr>' +
-      '<tr class="total-row"><td colspan="2">Grand Total Commitment After Settlement</td>' +
-      '<td class="num" id="hfj-grand-' + k + '">-</td><td></td></tr></tfoot></table></div>' +
+      // hidden until there is a row to show, exactly as the main applicant's
+      // settlement table in js/intake.js
+      '<div class="subhead" style="margin-top:26px">Balance Transfer / Facilities To Be Settled - Joint Applicant ' + k + '</div>' +
+      ((a.bt || []).length
+        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+          '<th>Type</th><th>Outstanding</th><th>Monthly Repayment</th><th></th>' +
+          '</tr></thead><tbody data-hfjbt="' + k + '">' + btRows + '</tbody>' +
+          '<tfoot><tr class="total-row"><td colspan="2">Total To Be Settled</td>' +
+          '<td class="num" id="hfj-bt-total-' + k + '">-</td><td></td></tr>' +
+          '<tr class="total-row"><td colspan="2">Grand Total Commitment After Settlement</td>' +
+          '<td class="num" id="hfj-grand-' + k + '">-</td><td></td></tr></tfoot></table></div>'
+        : '') +
       '<div style="margin-top:8px"><button class="btn small secondary" data-hfj-addbt="' + k + '" type="button">+ Add settlement row</button></div>' +
       '</div></div>';
   };
@@ -590,19 +595,19 @@
     var d = epf.deductions;
     return '<div class="dropzone" id="dz-hfjinc-' + k + '">' +
       '<div class="dz-title">EPF / KWSP statement</div>' +
-      '<div class="dz-sub">Drop or click. One or more EPF / KWSP PDFs at once.</div>' +
+      '<div class="dz-sub">Drop or click &middot; one or more EPF statements</div>' +
       '<input type="file" id="file-hfjinc-' + k + '" accept=".pdf" multiple style="display:none"></div>' +
       '<div id="dz-hfjinc-' + k + '-msg"></div>' +
       '<div class="field narrow" style="margin:8px 0">' +
       '<label>EPF Rate (%)</label><input class="editable" type="text" inputmode="decimal" data-fmt="pct" data-jepf-rate value="' + esc(epf.epfRatePct) + '"></div>' +
-      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th>Month</th><th>Caruman Ahli (RM)</th><th>Proxy Monthly Income (RM)</th></tr></thead>' +
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th>Month</th><th>Caruman Ahli</th><th>Proxy Monthly Income</th></tr></thead>' +
       '<tbody data-hfjepf="' + k + '">' + rows + '</tbody></table></div>' +
       '<div class="subhead">Deductions</div>' +
       '<div class="grid c4">' +
-      '<div class="field"><label>EPF (RM)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-jedf="epf" value="' + esc(d.epf) + '"></div>' +
-      '<div class="field"><label>PCB / Zakat (RM)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-jedf="pcb" value="' + esc(d.pcb) + '"></div>' +
-      '<div class="field"><label>SOCSO (RM)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-jedf="socso" value="' + esc(d.socso) + '"></div>' +
-      '<div class="field"><label>Other (RM)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-jedf="other" value="' + esc(d.other) + '"></div></div>';
+      '<div class="field"><label>EPF</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-jedf="epf" value="' + esc(d.epf) + '"></div>' +
+      '<div class="field"><label>PCB / Zakat</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-jedf="pcb" value="' + esc(d.pcb) + '"></div>' +
+      '<div class="field"><label>SOCSO</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-jedf="socso" value="' + esc(d.socso) + '"></div>' +
+      '<div class="field"><label>Other</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-jedf="other" value="' + esc(d.other) + '"></div></div>';
   }
 
   /** Recognised-income tiles for a joint applicant, mirroring the main
@@ -652,13 +657,13 @@
           '<td class="editable"><input data-bf="bank2" type="text" inputmode="decimal" data-fmt="money" value="' + esc(m.bank2) + '"></td></tr>';
       }).join('');
       bizHtml = '<div class="subhead">Income for Bizman - ' + esc('Joint Applicant ' + k) + '</div>' +
-        '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Month</th><th>Bank I Total Credit (RM)</th><th>Bank II Total Credit (RM)</th></tr></thead>' +
+        '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Month</th><th>Bank I Total Credit</th><th>Bank II Total Credit</th></tr></thead>' +
         '<tbody data-hfjbiz="' + k + '">' + bizRows + '</tbody></table></div>' +
         '<div class="grid c4" style="margin-top:8px">' +
         '<div class="field"><label>Profit Margin (%)</label><input class="editable" type="text" inputmode="decimal" data-fmt="pct" data-bs="profitMarginPct" value="' + esc(b.profitMarginPct) + '" step="0.01"></div>' +
         '<div class="field"><label>Shareholding (%)</label><input class="editable" type="text" inputmode="decimal" data-fmt="pct" data-bs="shareholdingPct" value="' + esc(b.shareholdingPct) + '"></div>' +
-        '<div class="field"><label>Avg Latest 2 Years ITR (annual RM)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-bs="avgITRAnnual" value="' + esc(b.avgITRAnnual) + '"></div>' +
-        '<div class="field"><label>Tax Deduction LHDN (RM/mth)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-bs="taxDeduction" value="' + esc(b.taxDeduction) + '"></div></div>';
+        '<div class="field"><label>Avg Latest 2 Years ITR (annual)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-bs="avgITRAnnual" value="' + esc(b.avgITRAnnual) + '"></div>' +
+        '<div class="field"><label>Tax Deduction LHDN (monthly)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-bs="taxDeduction" value="' + esc(b.taxDeduction) + '"></div></div>';
     }
 
     // each joint applicant picks their own type here
@@ -904,33 +909,33 @@
     if (h.product === 'HOME ONE ACCOUNT') {
       var ho = h.hoa;
       var termGrid = function (t, p) {
-        return field('Original Financing Amount (RM)', p + '-fin', t.financing) +
-          field('MRTT Contribution (RM)', p + '-mrtt', t.mrtt) +
-          field('Valuation Cost (RM)', p + '-val', t.valuation) +
-          field('Legal &amp; Stamping Cost (RM)', p + '-legal', t.legal) +
+        return field('Original Financing Amount', p + '-fin', t.financing) +
+          field('MRTT Contribution', p + '-mrtt', t.mrtt) +
+          field('Valuation Cost', p + '-val', t.valuation) +
+          field('Legal &amp; Stamping Cost', p + '-legal', t.legal) +
           field('Financing Tenure (Years)', p + '-tenure', t.tenureYears) +
           field('SBR (%)', p + '-sbr', t.sbrPct, { step: '0.01' }) +
           field('Spread on SBR (%)', p + '-spread', t.spreadPct, { step: '0.01' });
       };
       finGrid =
         '<div class="grid c3">' +
-        field('Property Value (RM)', 'hoa-prop', ho.propertyValue) +
-        field('Monthly CTF Installment (RM)', 'hf-ctf', h.ctf) +
+        field('Property Value', 'hoa-prop', ho.propertyValue) +
+        field('Monthly CTF Installment', 'hf-ctf', h.ctf) +
         '</div>' +
         '<div class="subhead">Term Financing 1</div><div class="grid c4">' + termGrid(ho.t1, 'hoa1') + '</div>' +
         '<div class="subhead">Term Financing 2</div><div class="grid c4">' + termGrid(ho.t2, 'hoa2') + '</div>';
     } else {
       finGrid =
         '<div class="grid c3">' +
-        field('Property Value (RM)', 'hf-prop', h.propertyValue) +
-        field('Original Financing Amount (RM)', 'hf-fin', h.financing) +
-        field('MRTT Contribution (RM)', 'hf-mrtt', h.mrtt) +
-        field('Valuation Cost (RM)', 'hf-val', h.valuation) +
-        field('Legal &amp; Stamping Cost (RM)', 'hf-legal', h.legal) +
+        field('Property Value', 'hf-prop', h.propertyValue) +
+        field('Original Financing Amount', 'hf-fin', h.financing) +
+        field('MRTT Contribution', 'hf-mrtt', h.mrtt) +
+        field('Valuation Cost', 'hf-val', h.valuation) +
+        field('Legal &amp; Stamping Cost', 'hf-legal', h.legal) +
         field('Financing Tenure (Years)', 'hf-tenure', h.tenureYears) +
         field('SBR (%)', 'hf-sbr', h.sbrPct, { step: '0.01' }) +
         field('Spread on SBR (%)', 'hf-spread', h.spreadPct, { step: '0.01' }) +
-        field('Monthly CTF Installment (RM)', 'hf-ctf', h.ctf) +
+        field('Monthly CTF Installment', 'hf-ctf', h.ctf) +
         '</div>';
     }
 
@@ -1049,20 +1054,20 @@
         var cell = el('hfj-commit-' + k + '-' + i);
         if (!cell) return;
         var lc = E.lineCommitment(row, r.hfType, 'HF');
-        cell.textContent = fmt(lc.commitment);
+        cell.textContent = amt(lc.commitment);
         cell.classList.toggle('override', lc.overridden);
       });
       (a.bt || []).forEach(function (row, i) {
         var cell = el('hfj-btrep-' + k + '-' + i);
         // HF master D62 = outstanding x 5% (no RM50 floor)
-        if (cell) cell.textContent = fmt(Math.abs(num(row.outstanding)) * 0.05);
+        if (cell) cell.textContent = amt(Math.abs(num(row.outstanding)) * 0.05);
       });
       var totals = null;
       r.perApplicant.forEach(function (p) { if (p.key === k) totals = p; });
       if (totals) {
-        var t55 = el('hfj-total-' + k); if (t55) t55.textContent = fmt(totals.l55);
-        var t56 = el('hfj-bt-total-' + k); if (t56) t56.textContent = fmt(totals.l56);
-        var t57 = el('hfj-grand-' + k); if (t57) t57.textContent = fmt(totals.l57);
+        var t55 = el('hfj-total-' + k); if (t55) t55.textContent = amt(totals.l55);
+        var t56 = el('hfj-bt-total-' + k); if (t56) t56.textContent = amt(totals.l56);
+        var t57 = el('hfj-grand-' + k); if (t57) t57.textContent = amt(totals.l57);
       }
       var nameEl = el('hfj-name-' + k); if (nameEl) nameEl.textContent = a.name || '-';
       var icEl = el('hfj-ic-' + k); if (icEl) icEl.textContent = E.formatIC(a.ic) || '-';
@@ -1175,11 +1180,11 @@
     if (tab === 'structured' || tab === 'puc') {
       var o = tab === 'puc' ? hp.puc : hp.structured;
       html += '<div class="grid c3">' +
-        field('Property Value (RM)', 'hpx-prop', o.propertyValue) +
-        field('Original Financing Amount (RM)', 'hpx-fin', o.financing) +
-        field('MRTT Contribution (RM)', 'hpx-mrtt', o.mrtt) +
-        field('Valuation Cost (RM)', 'hpx-val', o.valuation) +
-        field('Legal &amp; Stamping (RM)', 'hpx-legal', o.legal) +
+        field('Property Value', 'hpx-prop', o.propertyValue) +
+        field('Original Financing Amount', 'hpx-fin', o.financing) +
+        field('MRTT Contribution', 'hpx-mrtt', o.mrtt) +
+        field('Valuation Cost', 'hpx-val', o.valuation) +
+        field('Legal &amp; Stamping', 'hpx-legal', o.legal) +
         field('Tenure (years)', 'hpx-tenure', o.tenureYears) +
         (tab === 'puc' ? field('Grace Period (years)', 'hpx-grace', o.graceYears) : '') +
         field('Ceiling Rate (%)', 'hpx-ceil', o.ceilingPct, { step: '0.01' }) +
@@ -1196,11 +1201,11 @@
     } else if (tab === 'fixed') {
       var f = hp.fixed;
       html += '<div class="grid c3">' +
-        field('Property Value (RM)', 'hpf-prop', f.propertyValue) +
-        field('Financing Amount (RM)', 'hpf-fin', f.financing) +
-        field('MRTT (RM)', 'hpf-mrtt', f.mrtt) +
-        field('Valuation Cost (RM)', 'hpf-val', f.valuation) +
-        field('Legal &amp; Stamping (RM)', 'hpf-legal', f.legal) +
+        field('Property Value', 'hpf-prop', f.propertyValue) +
+        field('Financing Amount', 'hpf-fin', f.financing) +
+        field('MRTT', 'hpf-mrtt', f.mrtt) +
+        field('Valuation Cost', 'hpf-val', f.valuation) +
+        field('Legal &amp; Stamping', 'hpf-legal', f.legal) +
         field('Tenure (years)', 'hpf-tenure', f.tenureYears) +
         field('Fixed Rate (%)', 'hpf-rate', f.ratePct, { step: '0.01' }) +
         '</div><div id="hfp-out"></div>';
@@ -1212,16 +1217,16 @@
     } else if (tab === 'homeone') {
       var ho = hp.homeOne;
       function hoTermInputs(t, p) {
-        return field('Original Financing Amount (RM)', p + '-fin', t.financing) +
-          field('Renovation + Education (RM)', p + '-ren', t.renovation) +
-          field('MRTT Contribution (RM)', p + '-mrtt', t.mrtt) +
-          field('Valuation Cost (RM)', p + '-val', t.valuation) +
-          field('Legal &amp; Stamping (RM)', p + '-legal', t.legal) +
+        return field('Original Financing Amount', p + '-fin', t.financing) +
+          field('Renovation + Education', p + '-ren', t.renovation) +
+          field('MRTT Contribution', p + '-mrtt', t.mrtt) +
+          field('Valuation Cost', p + '-val', t.valuation) +
+          field('Legal &amp; Stamping', p + '-legal', t.legal) +
           field('Financing Tenure (Years)', p + '-tenure', t.tenureYears) +
           field('Spread on SBR (%)', p + '-spread', t.spreadPct, { step: '0.01' });
       }
       html += '<div class="grid c3">' +
-        field('Property Value (RM)', 'hph-prop', ho.propertyValue) +
+        field('Property Value', 'hph-prop', ho.propertyValue) +
         field('Standardised Base Rate SBR (%)', 'hph-sbr', ho.sbrPct, { step: '0.01' }) +
         field('Ceiling Rate (%)', 'hph-ceil', ho.ceilingPct, { step: '0.01' }) +
         '</div>' +
@@ -1771,20 +1776,29 @@
   /* ============================================================
      MAKER / CHECKER SIGN-OFF (draw on canvas OR upload a PNG/JPEG)
 
-     Two states, driven by server-injected globals (web/index.php):
+     Two states, driven by globals set in js/pages/calculator.js (see
+     web/index.html) from the local JSON database:
        - NEW case (no window.__DSR_CASE): the maker (role "normal")
          fills their own box + picks a checker from
-         window.__DSR_CHECKERS, then "Submit to Checker" posts the
-         full snapshot to /api/case_submit.php. Nothing is saved
-         anywhere until that click - same trust model as the old
-         "Export session" button, just server-side instead of a
-         local file.
+         window.__DSR_CHECKERS, then "Submit to Checker" calls
+         App.submitCaseToChecker() (web/js/caseSync.js), which writes
+         straight into the local database via store/cases.js. Nothing
+         is saved anywhere until that click.
        - EXISTING case (window.__DSR_CASE set): both boxes render
          from the stored payload; only the assigned checker, while
          the case is still pending, gets an editable checker box +
-         Approve/Reject buttons (/api/checker_decision.php). Every
-         other viewer (the maker, an admin, or after a decision is
-         made) sees a fully read-only record.
+         Approve/Reject/Return buttons (App.submitCheckerDecision,
+         App.returnCaseToMaker). Every other viewer (the maker, an
+         admin, or after a decision is made) sees a fully read-only
+         record.
+       - RETURNED case (status 'returned'): the checker spotted
+         something wrong and sent it back rather than rejecting it.
+         The case leaves the checker's queue and the maker gets the
+         calculator unlocked again (Edit Case) plus a "Resubmit to
+         Checker" button (App.resubmitCase) that routes it back to
+         the same checker. Return and resubmit both carry a comment,
+         and the whole exchange is rendered as a thread below the
+         status banner so the next reviewer can see what was queried.
      ============================================================ */
   App.renderSignoff = function () {
     var so = App.state.signoff;
@@ -1794,16 +1808,24 @@
     var isMaker = user.role === 'normal';
     var isChecker = user.role === 'checker';
     var canDecide = !!(isChecker && caseInfo && caseInfo.status === 'pending_checker');
+    var isReturned = !!(caseInfo && caseInfo.status === 'returned');
+    var isOwnCase = !!(caseInfo && user.id === caseInfo.makerId);
     // the maker can fix a typo / reduce an amount etc. on their OWN case
-    // while it's still awaiting the checker - never once decided, and
-    // never anyone else's case (checkers/admins only ever view+decide)
-    var canEdit = !!(caseInfo && caseInfo.status === 'pending_checker' && user.id === caseInfo.makerId);
+    // while it's still awaiting the checker, or after the checker sent it
+    // back - never once decided, and never anyone else's case
+    // (checkers/admins only ever view+decide)
+    var canEdit = !!(isOwnCase && (caseInfo.status === 'pending_checker' || isReturned));
+    // only a returned case can be routed back into the checker's queue;
+    // one that is still pending is already there
+    var canResubmit = !!(isOwnCase && isReturned);
 
     if (isNewCase && isMaker && !so.makerName && user.name) { so.makerName = user.name; }
     if (isNewCase && isMaker && !so.makerId && user.staffId) { so.makerId = user.staffId; }
     if (canDecide && !so.checkerName && user.name) { so.checkerName = user.name; }
     if (canDecide && !so.checkerId && user.staffId) { so.checkerId = user.staffId; }
-    if (canDecide && !so.checkerDate) { so.checkerDate = new Date().toISOString().slice(0, 10); }
+    // the checker's sign-off date must be the Malaysian calendar day - taking
+    // it from UTC back-dates every signature made before 08:00 MYT
+    if (canDecide && !so.checkerDate) { so.checkerDate = Db.today(); }
 
     function sigBox(role, key, editable) {
       var dis = editable ? '' : ' disabled';
@@ -1830,8 +1852,9 @@
 
     function statusBanner() {
       if (!caseInfo) return '';
-      var cls = { draft: 'warn', pending_checker: 'warn', approved: 'ok', rejected: 'fail' }[caseInfo.status] || 'warn';
-      var label = { draft: 'DRAFT', pending_checker: 'PENDING CHECKER', approved: 'APPROVED', rejected: 'REJECTED' }[caseInfo.status] || caseInfo.status;
+      var cls = { draft: 'warn', pending_checker: 'warn', returned: 'info', approved: 'ok', rejected: 'fail' }[caseInfo.status] || 'warn';
+      var label = { draft: 'DRAFT', pending_checker: 'PENDING CHECKER', returned: 'RETURNED TO MAKER',
+        approved: 'APPROVED', rejected: 'REJECTED' }[caseInfo.status] || caseInfo.status;
       var line = '<b>' + esc(caseInfo.reference) + '</b> &nbsp; <span class="verdict ' + cls + '">' + label + '</span>' +
         (caseInfo.checkerName ? ' &nbsp; routed to <b>' + esc(caseInfo.checkerName) + '</b>' : '');
       // transparency for a maker-side correction: visible to the checker
@@ -1839,27 +1862,92 @@
       if (caseInfo.editCount > 0) {
         line += ' &nbsp; <span class="verdict warn">EDITED &times;' + caseInfo.editCount + '</span>' +
           (caseInfo.editedAt ? ' <span style="font-size:11px;color:var(--muted)">last ' +
-            esc(caseInfo.editedAt.slice(0, 19).replace('T', ' ')) + ' UTC</span>' : '');
+            esc(Db.dateTime(caseInfo.editedAt)) + ' ' + Db.TZ_LABEL + '</span>' : '');
+      }
+      // a case that has been round the loop shows how many times, so a
+      // reviewer can tell a first submission from a third attempt
+      if (caseInfo.returnCount > 0 && caseInfo.status !== 'returned') {
+        line += ' &nbsp; <span class="verdict warn">RETURNED &times;' + caseInfo.returnCount + '</span>';
       }
       if (caseInfo.status === 'approved' || caseInfo.status === 'rejected') {
-        line += '<br><span style="font-size:12px;color:var(--muted)">Decided ' + esc(caseInfo.decidedAt || '') +
+        line += '<br><span style="font-size:12px;color:var(--muted)">Decided ' +
+          esc(Db.dateTime(caseInfo.decidedAt)) + ' ' + Db.TZ_LABEL +
           (caseInfo.decisionNotes ? ' - ' + esc(caseInfo.decisionNotes) : '') + '</span>';
       }
+      if (caseInfo.status === 'returned') {
+        line += '<br><span style="font-size:12px;color:var(--muted)">Returned ' +
+          esc(Db.dateTime(caseInfo.returnedAt)) + ' ' + Db.TZ_LABEL +
+          (caseInfo.returnCount > 1 ? ' (' + caseInfo.returnCount + 'x so far)' : '') + '</span>';
+      }
       return '<div class="notice info" style="margin-bottom:14px">' + line + '</div>';
+    }
+
+    /**
+     * The maker/checker exchange: every return, resubmission and final
+     * decision, oldest first. Printed with the case (no .no-print) - the
+     * reason a case went back and forth is part of the record.
+     */
+    function commentThreadHtml() {
+      var list = (caseInfo && caseInfo.comments) || [];
+      if (!list.length) return '';
+      var TYPE = {
+        RETURNED: { label: 'Returned for amendment', cls: 'info' },
+        RESUBMITTED: { label: 'Resubmitted to checker', cls: 'warn' },
+        APPROVED: { label: 'Approved', cls: 'ok' },
+        REJECTED: { label: 'Rejected', cls: 'fail' }
+      };
+      var items = list.map(function (c) {
+        var t = TYPE[c.type] || { label: c.type, cls: 'warn' };
+        return '<li style="padding:9px 0;border-top:1px solid var(--border)">' +
+          '<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">' +
+            '<span class="verdict ' + t.cls + '">' + esc(t.label) + '</span>' +
+            '<b style="font-size:12.5px">' + esc(c.by_name || 'Unknown user') + '</b>' +
+            '<span style="font-size:11px;color:var(--muted)">' +
+              esc(Db.dateTime(c.at)) + ' ' + Db.TZ_LABEL + '</span>' +
+          '</div>' +
+          (c.text
+            ? '<div style="font-size:12.5px;margin-top:4px;white-space:pre-wrap">' + esc(c.text) + '</div>'
+            : '<div style="font-size:12px;margin-top:4px;color:var(--muted)">No comment given.</div>') +
+          '</li>';
+      }).join('');
+      return '<div style="margin-bottom:14px">' +
+        '<div class="subhead">Case comments (' + list.length + ')</div>' +
+        '<ul style="list-style:none;margin:0;padding:0">' + items + '</ul></div>';
     }
 
     function editControlsHtml() {
       if (!canEdit) return '';
       if (App.caseEditing) {
-        return '<div class="no-print" style="margin-bottom:14px;display:flex;gap:10px;align-items:center">' +
-          '<button class="btn" id="btn-save-edit" type="button">Save Changes</button>' +
-          '<button class="btn secondary" id="btn-cancel-edit" type="button">Cancel</button>' +
-          '<span id="edit-save-msg" style="font-size:12.5px"></span>' +
+        // A returned case always lands here (caseSync.js opens it unlocked),
+        // so this is the maker's only control surface for one.
+        return '<div class="no-print" style="margin-bottom:14px">' +
+          '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+            // a returned case has one job - fix it and send it back - so it
+            // gets the single Save & Resubmit action; a still-pending case
+            // being edited in place gets the plain save
+            (canResubmit
+              ? '<button class="btn" id="btn-save-resubmit" type="button">Save &amp; Resubmit</button>'
+              : '<button class="btn" id="btn-save-edit" type="button">Save Changes</button>') +
+            '<button class="btn secondary" id="btn-cancel-edit" type="button">' +
+              // nothing to "cancel" back to on a returned case - it opens in
+              // edit mode - so the reload just throws away what was typed
+              (canResubmit ? 'Discard Changes' : 'Cancel') + '</button>' +
+            '<span id="edit-save-msg" style="font-size:12.5px"></span>' +
+          '</div>' +
+          (canResubmit
+            ? '<div class="field" style="margin-top:10px;max-width:520px">' +
+                '<label>Reply to the checker (optional)</label>' +
+                '<textarea id="so-resubmit-note" rows="2" style="width:100%"></textarea>' +
+              '</div>'
+            : '') +
           '</div>';
       }
+      // read-only entry point - only ever a still-pending case, since a
+      // returned one is unlocked from the moment it loads
       return '<div class="no-print" style="margin-bottom:14px">' +
         '<button class="btn secondary" id="btn-start-edit" type="button">Edit Case</button> ' +
-        '<span style="font-size:11.5px;color:var(--muted)">Found a typo, or the checker asked for a smaller amount? Edit and re-save - the checker will see it was revised.</span>' +
+        '<span style="font-size:11.5px;color:var(--muted)">Found a typo, or the checker asked for a smaller amount? ' +
+        'Edit and re-save - the checker will see it was revised.</span>' +
         '</div>';
     }
 
@@ -1879,12 +1967,14 @@
 
     function decisionBlockHtml() {
       return '<div class="no-print" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">' +
-        '<div class="field"><label>Decision notes (required if rejecting)</label>' +
+        '<div class="field"><label>Comment (required if rejecting or returning)</label>' +
         '<textarea id="so-decision-notes" rows="2" style="width:100%"></textarea></div>' +
-        '<div style="display:flex;gap:10px;margin-top:8px">' +
+        '<div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">' +
         '<button class="btn" id="btn-decide-approve" type="button">Approve</button>' +
+        '<button class="btn secondary" id="btn-decide-return" type="button">Return to Maker</button>' +
         '<button class="btn danger" id="btn-decide-reject" type="button">Reject</button>' +
-        '</div><div id="so-decision-msg" style="margin-top:8px;font-size:12.5px"></div></div>';
+        '</div>' +
+        '<div id="so-decision-msg" style="margin-top:8px;font-size:12.5px"></div></div>';
     }
 
     var boxes = '<div class="sig-grid">' +
@@ -1894,7 +1984,7 @@
     var extra = (isNewCase && isMaker) ? submitBlockHtml() : (canDecide ? decisionBlockHtml() : '');
 
     el('signoff-panel').innerHTML = cardShell('card-signoff', 'Maker / Checker Sign-off',
-      statusBanner() + editControlsHtml() + boxes + extra);
+      statusBanner() + commentThreadHtml() + editControlsHtml() + boxes + extra);
 
     document.querySelectorAll('[data-so]:not([disabled])').forEach(function (inp) {
       inp.oninput = function () { App.state.signoff[this.dataset.so] = this.value; };
@@ -1976,7 +2066,7 @@
         msg.textContent = 'Submitting...';
         App.submitCaseToChecker(checkerId).then(function (result) {
           if (result.ok) {
-            location.href = '/index.php?case=' + result.id + '&submitted=1';
+            location.href = '/index.html?case=' + result.id + '&submitted=1';
           } else {
             msg.textContent = result.error || 'Submit failed.';
             msg.style.color = 'var(--fail)';
@@ -2001,7 +2091,7 @@
       };
       App.submitCheckerDecision(caseInfo.id, decision, notes, signoff).then(function (result) {
         if (result.ok) {
-          location.href = '/index.php?case=' + caseInfo.id + '&decided=1';
+          location.href = '/index.html?case=' + caseInfo.id + '&decided=1';
         } else {
           msg.textContent = result.error || 'Could not save decision.';
           msg.style.color = 'var(--fail)';
@@ -2012,6 +2102,62 @@
     if (appBtn) appBtn.onclick = function () { decide('approved'); };
     var rejBtn = el('btn-decide-reject');
     if (rejBtn) rejBtn.onclick = function () { decide('rejected'); };
+
+    // ---- return to maker (existing pending case, assigned checker only) ----
+    // Not a decision: the case leaves the queue but stays open, so the
+    // checker's signature deliberately isn't captured here - they sign when
+    // they finally approve or reject the amended case.
+    var retBtn = el('btn-decide-return');
+    if (retBtn) retBtn.onclick = function () {
+      var notes = el('so-decision-notes').value.trim();
+      if (!notes) {
+        App.modal.alert('Tell the maker what needs amending before returning the case.',
+          { type: 'error', title: 'Comment required' });
+        return;
+      }
+      App.modal.confirm('Send ' + caseInfo.reference + ' back to the maker for amendment?',
+        { title: 'Return to maker', okLabel: 'Return case', cancelLabel: 'Keep reviewing' }
+      ).then(function (ok) {
+        if (!ok) return;
+        retBtn.disabled = true;
+        var msg = el('so-decision-msg');
+        msg.textContent = 'Returning case...';
+        App.returnCaseToMaker(caseInfo.id, notes).then(function (result) {
+          if (result.ok) {
+            location.href = '/index.html?case=' + caseInfo.id + '&returned=1';
+          } else {
+            msg.textContent = result.error || 'Could not return the case.';
+            msg.style.color = 'var(--fail)';
+            retBtn.disabled = false;
+          }
+        });
+      });
+    };
+
+    // ---- maker resubmitting a returned case ----
+    // The on-screen figures always go with it: the case has been editable
+    // since it loaded, so they are what the maker wants the checker to see
+    // whether or not anything was actually changed.
+    var saveResubmitBtn = el('btn-save-resubmit');
+    if (saveResubmitBtn) saveResubmitBtn.onclick = function () {
+      if (!App.computed.intakeReady) {
+        App.modal.alert('Complete the customer, CCRIS and income intake before resubmitting.', { type: 'error' });
+        return;
+      }
+      var noteEl = el('so-resubmit-note');
+      saveResubmitBtn.disabled = true;
+      var msg = el('edit-save-msg');
+      msg.textContent = 'Resubmitting...';
+      App.resubmitCase(caseInfo.id, noteEl ? noteEl.value.trim() : '', true).then(function (result) {
+        if (result.ok) {
+          location.href = '/index.html?case=' + caseInfo.id + '&resubmitted=1';
+        } else {
+          msg.textContent = result.error || 'Resubmit failed.';
+          msg.style.color = 'var(--fail)';
+          saveResubmitBtn.disabled = false;
+        }
+      });
+    };
 
     // ---- maker editing their own pending case ----
     var startEditBtn = el('btn-start-edit');
@@ -2039,7 +2185,7 @@
       msg.textContent = 'Saving...';
       App.updateCase(caseInfo.id).then(function (result) {
         if (result.ok) {
-          location.href = '/index.php?case=' + caseInfo.id + '&edited=1';
+          location.href = '/index.html?case=' + caseInfo.id + '&edited=1';
         } else {
           msg.textContent = result.error || 'Save failed.';
           msg.style.color = 'var(--fail)';

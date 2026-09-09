@@ -1,15 +1,15 @@
 /* ============================================================
-   app.css - chrome for the server-rendered pages (login, dashboard,
+   app.css - chrome for the client-rendered pages (login, dashboard,
    case list, admin). Dashboard/Cases/Admin/Users/Audit Log/Settings
    all share the SAME .layout/.sidebar/.nav-item components the
-   calculator (web/index.php) already uses, via partials/header.php
-   +footer.php - one sidebar language for the whole authenticated
-   app. This file only adds what styles.css doesn't cover: the
-   content-area helpers below, auth pages, stat tiles, tables.
+   calculator (web/index.html) already uses, via js/chrome.js - one
+   sidebar language for the whole authenticated app. This file only
+   adds what styles.css doesn't cover: the content-area helpers
+   below, auth pages, stat tiles, tables.
    ============================================================ */
 
-/* calculator page (web/index.php) AND the shared sidebar foot
-   (partials/header.php): case/account links, styled to match the
+/* calculator page (web/index.html) AND the shared sidebar foot
+   (js/chrome.js): case/account links, styled to match the
    existing .sidebar .foot button rules */
 .sidebar .foot a {
   width: 100%; box-sizing: border-box; padding: 8px 10px;
@@ -20,7 +20,7 @@
 .sidebar .foot a:hover { background: rgba(255,255,255,.1); color: #fff; }
 .sidebar .user-chip { font-size: 11px; color: rgba(255,255,255,.55); text-transform: capitalize; padding: 0 2px; }
 
-/* calculator sidebar (web/index.php) when viewing an existing case:
+/* calculator sidebar (web/index.html) when viewing an existing case:
    Standalone/Combo mode buttons are swapped for this instead (the mode
    is fixed by whoever submitted the case, so switching it here isn't
    a real action) */
@@ -35,7 +35,7 @@
 .app-shell .sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
 
 /* ============================================================
-   auth pages (login.php, change_password.php) - a slow-drifting
+   auth pages (login.html, change_password.html) - a slow-drifting
    animated gradient mesh (brand navy/gold/sky, blurred radial blobs
    easing back and forth on staggered loops) behind a true glass
    (frosted, translucent) login card. No video/image asset to host -
@@ -137,6 +137,13 @@
 }
 .auth-field:focus-within svg { color: var(--primary); }
 
+/* The auth screens (login, first-admin setup, change password) keep their
+   own left-aligned form styling. The centred field convention in
+   styles.css is for the calculator and its tables - it must not reach in
+   here, where the inputs are icon-prefixed and read as normal text. */
+.auth-box input, .auth-box select, .auth-box textarea { text-align: left; }
+.auth-box label { text-align: left; }
+
 .auth-box .btn {
   width: 100%; margin-top: 22px; justify-content: center; padding: 11px 14px;
   border-radius: 10px; font-size: 14.5px;
@@ -192,11 +199,14 @@
 .status-pill.pending_checker { background: var(--warn-soft); color: var(--warn); }
 .status-pill.approved { background: var(--ok-soft); color: var(--ok); }
 .status-pill.rejected { background: var(--fail-soft); color: var(--fail); }
+/* returned = sent back to the maker for amendment; deliberately not a
+   fail colour, the case is still alive and just sitting in the other court */
+.status-pill.returned { background: #E4EFF5; color: #1F6F92; }
 
 table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
-table.data th, table.data td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+table.data th, table.data td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: center; }
 table.data th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
-table.data td.num, table.data th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.data td.num, table.data th.num { text-align: center; font-variant-numeric: tabular-nums; }
 table.data tr:hover td { background: var(--bg); }
 table.data a { color: var(--primary); font-weight: 600; text-decoration: none; }
 table.data a:hover { text-decoration: underline; }

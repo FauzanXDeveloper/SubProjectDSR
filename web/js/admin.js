@@ -1,10 +1,10 @@
 /* ============================================================
-   admin.js - Calculation Settings editor (admin/settings.php).
+   admin.js - Calculation Settings editor (admin/settings.html).
 
-   Edits Engine.CONFIG values and POSTs them as overrides to
-   /api/config_save.php (policy_config table, admin-only). Every
-   user's calculator merges those overrides over the Excel defaults
-   on its next page load. Reset clears the overrides entirely.
+   Edits Engine.CONFIG values and saves them as overrides via
+   store/policyConfig.js, into the browser's local JSON database.
+   Every session's calculator merges those overrides over the Excel
+   defaults on its next page load. Reset clears the overrides entirely.
 
    PF pricing matrices: edited per grid (raw fractions p.a.,
    blank = NA); included in the saved overrides only once a cell
@@ -39,8 +39,8 @@
             frac = stored as fraction, edited as percent */
   function show(v, kind) {
     if (v == null) return '';
-    if (kind === 'frac') return String(+(v * 100).toFixed(6));
-    return String(v);
+    if (kind === 'frac') v = v * 100;
+    return (v % 1 !== 0) ? v.toFixed(2) : String(v);
   }
   function store(v, kind) {
     var n = parseNum(v);
@@ -51,67 +51,67 @@
   /* ---------------- schema ---------------- */
   var SECTIONS = [
     { title: 'Customer Class (TYPE A / TYPE B)',
-      note: 'TYPE B at or above this gross monthly income; TYPE A below. Drives the PF DSR ceilings and the credit-card CCRIS commitment rule.',
+      note: 'TYPE B at or above this gross monthly income; TYPE A below.',
       fields: [
-        ['classBreak', 'Class break - gross income (RM)', 'money']
+        ['classBreak', 'Class break - gross income', 'money']
       ] },
     { title: 'Personal Financing - DSR & NDI',
       fields: [
         ['pf.typeA.threshold', 'TYPE A DSR cap (%)', 'frac'],
-        ['pf.typeA.ndiMin', 'TYPE A NDI minimum (RM)', 'money'],
+        ['pf.typeA.ndiMin', 'TYPE A NDI minimum', 'money'],
         ['pf.typeB.thresholdLow', 'TYPE B DSR cap - lower band (%)', 'frac'],
         ['pf.typeB.thresholdHigh', 'TYPE B DSR cap - upper band (%)', 'frac'],
-        ['pf.typeB.incomeBreak', 'TYPE B band break - gross income (RM)', 'money'],
-        ['pf.typeB.ndiMin', 'TYPE B NDI minimum (RM)', 'money'],
+        ['pf.typeB.incomeBreak', 'TYPE B band break - gross income', 'money'],
+        ['pf.typeB.ndiMin', 'TYPE B NDI minimum', 'money'],
         ['pf.stress.low', 'Stress DSR cap - lower band (%)', 'frac'],
         ['pf.stress.high', 'Stress DSR cap - upper band (%)', 'frac'],
-        ['pf.stress.incomeBreak', 'Stress band break (RM)', 'money'],
-        ['pf.gate.minIncome', 'Eligibility: minimum gross income (RM)', 'money'],
-        ['pf.gate.autoOk', 'Eligibility: auto-OK gross income (RM)', 'money']
+        ['pf.stress.incomeBreak', 'Stress band break', 'money'],
+        ['pf.gate.minIncome', 'Eligibility: minimum gross income', 'money'],
+        ['pf.gate.autoOk', 'Eligibility: auto-OK gross income', 'money']
       ],
       map: { path: 'pf.gradeMax', title: 'Max financing by PF risk grade (income band 3,000-4,999)',
-             keyLabel: 'Risk grade', valLabel: 'Max amount (RM)', kind: 'money' } },
+             keyLabel: 'Risk grade', valLabel: 'Max amount', kind: 'money' } },
     { title: 'Home Financing - DSR thresholds',
       fields: [
-        ['hf.normal.band1Min', 'NORMAL band 1 from (RM)', 'money'],
+        ['hf.normal.band1Min', 'NORMAL band 1 from', 'money'],
         ['hf.normal.band1Thr', 'NORMAL band 1 DSR cap (%)', 'frac'],
-        ['hf.normal.band2Min', 'NORMAL band 2 from (RM)', 'money'],
+        ['hf.normal.band2Min', 'NORMAL band 2 from', 'money'],
         ['hf.normal.band2Thr', 'NORMAL band 2 DSR cap (%)', 'frac'],
-        ['hf.normal.band3Min', 'NORMAL band 3 from (RM)', 'money'],
+        ['hf.normal.band3Min', 'NORMAL band 3 from', 'money'],
         ['hf.normal.band3Thr', 'NORMAL band 3 DSR cap (%)', 'frac'],
-        ['hf.bizman.band2Min', 'BIZMAN band from (RM)', 'money'],
+        ['hf.bizman.band2Min', 'BIZMAN band from', 'money'],
         ['hf.bizman.band2Thr', 'BIZMAN band DSR cap (%)', 'frac'],
-        ['hf.bizman.band3Min', 'BIZMAN top band from (RM)', 'money'],
+        ['hf.bizman.band3Min', 'BIZMAN top band from', 'money'],
         ['hf.bizman.band3Thr', 'BIZMAN top band DSR cap (%)', 'frac']
       ] },
     { title: 'Unsecured exposure',
       fields: [
-        ['unsecured.cap1Min', 'Cap band 1 from (RM)', 'money'],
+        ['unsecured.cap1Min', 'Cap band 1 from', 'money'],
         ['unsecured.cap1', 'Cap band 1 (%)', 'frac'],
-        ['unsecured.cap2Min', 'Cap band 2 from (RM)', 'money'],
+        ['unsecured.cap2Min', 'Cap band 2 from', 'money'],
         ['unsecured.cap2', 'Cap band 2 (%)', 'frac'],
-        ['unsecured.cap3Min', 'Cap band 3 from (RM)', 'money'],
+        ['unsecured.cap3Min', 'Cap band 3 from', 'money'],
         ['unsecured.cap3', 'Cap band 3 (%)', 'frac'],
         ['unsecured.mumLow', 'MUM - base multiplier', 'num'],
-        ['unsecured.mumMidMin', 'MUM - mid band above (RM)', 'money'],
+        ['unsecured.mumMidMin', 'MUM - mid band above', 'money'],
         ['unsecured.mumMid', 'MUM - mid multiplier', 'num'],
-        ['unsecured.mumHighMin', 'MUM - top band above (RM)', 'money'],
+        ['unsecured.mumHighMin', 'MUM - top band above', 'money'],
         ['unsecured.mumHigh', 'MUM - top multiplier', 'num']
       ] },
     { title: 'Credit Card',
       fields: [
-        ['cc.cardMax', 'Maximum card limit (RM)', 'money'],
-        ['cc.minPlatinum', 'Minimum limit - Platinum (RM)', 'money'],
-        ['cc.minSignature', 'Minimum limit - Signature / Both (RM)', 'money'],
+        ['cc.cardMax', 'Maximum card limit', 'money'],
+        ['cc.minPlatinum', 'Minimum limit - Platinum', 'money'],
+        ['cc.minSignature', 'Minimum limit - Signature / Both', 'money'],
         ['cc.minScore', 'Minimum eligible iScore', 'num'],
-        ['cc.salaryCap.minIncome', 'Salary cap: gross from (RM)', 'money'],
-        ['cc.salaryCap.maxIncome', 'Salary cap: gross to (RM)', 'money'],
+        ['cc.salaryCap.minIncome', 'Salary cap: gross from', 'money'],
+        ['cc.salaryCap.maxIncome', 'Salary cap: gross to', 'money'],
         ['cc.salaryCap.multiplier', 'Salary cap: limit = gross x', 'num'],
         ['cc.dsrLow', 'DSR cap - low band (%)', 'pct'],
         ['cc.dsrMid', 'DSR cap - mid band (%)', 'pct'],
         ['cc.dsrHigh', 'DSR cap - high band (%)', 'pct'],
-        ['cc.dsrMidMin', 'Mid band from (RM)', 'money'],
-        ['cc.dsrHighMin', 'High band above (RM)', 'money'],
+        ['cc.dsrMidMin', 'Mid band from', 'money'],
+        ['cc.dsrHighMin', 'High band above', 'money'],
         ['cc.instalmentPct', 'Monthly instalment (% of limit)', 'pct']
       ],
       map: { path: 'cc.multipliers', title: 'Limit multiplier by card risk grade',
@@ -119,10 +119,10 @@
     { title: 'CCRIS commitments',
       fields: [
         ['ccris.cardRatePct', 'Credit-card commitment rate (%)', 'pct'],
-        ['ccris.cardFloor', 'Credit-card commitment floor (RM)', 'money'],
+        ['ccris.cardFloor', 'Credit-card commitment floor', 'money'],
         ['ccris.odRatePct', 'Overdraft rate - % of LIMIT', 'pct'],
         ['ccris.btRatePct', 'Balance-transfer repayment rate (%)', 'pct'],
-        ['ccris.btFloor', 'Balance-transfer floor - PF/CC (RM)', 'money']
+        ['ccris.btFloor', 'Balance-transfer floor - PF/CC', 'money']
       ],
       map: { path: 'ccris.facilityFactors', title: 'Facility commitment factors (0 = excluded, 1 = as per CCRIS)',
              keyLabel: 'Facility code', valLabel: 'Factor', kind: 'num' },
@@ -221,7 +221,7 @@
     }).join('');
     return '<div class="card"><div class="card-head"><span>PF Pricing Matrices (profit rates)</span></div>' +
       '<div class="card-body">' +
-      '<div class="adm-note">Rates are % per annum, to 2 decimal places (13.50 = 13.50% p.a.). Blank = not available (NA). ' +
+      '<div class="adm-note">% p.a., 2 dp. Blank = NA. ' +
       'Rows = Experian PF risk grade 1-10, columns = tenure in whole years.</div>' +
       '<div class="field narrow" style="max-width:420px;margin-bottom:10px"><label>Matrix</label>' +
       '<select class="editable" id="mx-select">' + opts + '</select></div>' +
@@ -282,26 +282,22 @@
       el('sidebar').classList.toggle('open');
     });
   }
-  var hasOverridesOnServer = !!window.__DSR_CONFIG_OVERRIDES;
+  var hasOverridesOnServer = window.PolicyConfig ? PolicyConfig.hasOverrides() : !!window.__DSR_CONFIG_OVERRIDES;
   function refreshStatus() {
     el('adm-status').innerHTML = hasOverridesOnServer
       ? '<span class="chip ovr">CUSTOM SETTINGS ACTIVE</span> saved overrides are applied on top of the Excel defaults.'
       : '<span class="chip def">EXCEL DEFAULTS</span> no overrides saved - the system runs on the master Excel values.';
   }
 
-  /** POST the overrides (or {} to clear them) to the server; returns a Promise. */
+  /** Save the overrides (or {} to clear them) into the local JSON database; returns a Promise for API parity with the old fetch()-based version. */
   function saveToServer(overrides) {
-    return fetch(window.__DSR_CONFIG_SAVE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ csrf: window.__DSR_CSRF, config: overrides })
-    }).then(function (res) {
-      if (!res.ok) throw new Error('Server returned ' + res.status);
-      return res.json();
-    }).then(function (data) {
-      if (!data.ok) throw new Error(data.error || 'Save failed');
-      return data;
-    });
+    try {
+      var user = window.Auth ? Auth.currentUser() : null;
+      PolicyConfig.save(overrides, user ? user.id : null);
+      return Promise.resolve({ ok: true });
+    } catch (e) {
+      return Promise.reject(e);
+    }
   }
 
   document.addEventListener('input', function (ev) {

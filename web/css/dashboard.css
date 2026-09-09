@@ -1,0 +1,219 @@
+/* ============================================================
+   dashboard.css - the panel/analytics layer used by dashboard.html
+   and admin/index.html (<body class="dash">).
+
+   Every colour here is a --d-* token. This file defines the LIGHT
+   values; css/theme-dark.css redefines the same tokens (and the rest
+   of the app) under [data-theme="dark"]. So "light = the normal
+   banking look, dark = the analytics look" is one variable swap, not
+   two stylesheets.
+
+   Layout is one 12-column grid; a panel declares how many columns it
+   takes (.c3 / .c4 / .c8 / .c12) and collapses to full width on a
+   narrow screen. Panels on the same row are stretched to a common
+   height, so cards always line up. Text is deliberately sparse - a
+   title, the numbers, nothing else.
+   ============================================================ */
+
+:root {
+  --d-bg: #F6F7F9;            /* page behind the panels */
+  --d-panel: #FFFFFF;         /* panel surface */
+  --d-panel-2: #F1F4F8;       /* hover / inner surface */
+  --d-line: #E2E7EE;          /* hairline */
+  --d-ink: #1B2735;           /* primary text */
+  --d-muted: #64748B;         /* labels, axes */
+  --d-violet: #6D5BD0;
+  --d-blue: #0F4C81;
+  --d-cyan: #2790BC;
+  --d-green: #1B7A46;
+  --d-red: #B3261E;
+  --d-amber: #96690F;
+  --d-track: #E9EDF2;         /* radial-bar track */
+  --d-panel-shadow: 0 1px 2px rgba(16,32,48,.06);
+  --d-code-bg: #0F1B2C;
+  --d-code-ink: #CFE3FF;
+}
+
+body.dash { background: var(--d-bg); }
+body.dash .main { background: var(--d-bg); max-width: none; padding: 20px 26px 60px; }
+body.dash .topbar { margin-bottom: 16px; }
+body.dash .topbar h1 { color: var(--d-ink); font-size: 19px; }
+body.dash .app-shell { max-width: 1560px; }
+
+/* ---------------- grid + panel ---------------- */
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;          /* cards on a row share one height */
+}
+/* the tile wrappers are grid items; the panel inside has to fill them */
+.dash-grid > div { min-width: 0; display: flex; }
+.dash-grid > div > .panel { flex: 1; }
+.dash-grid .c3 { grid-column: span 3; }
+.dash-grid .c4 { grid-column: span 4; }
+.dash-grid .c5 { grid-column: span 5; }
+.dash-grid .c6 { grid-column: span 6; }
+.dash-grid .c7 { grid-column: span 7; }
+.dash-grid .c8 { grid-column: span 8; }
+.dash-grid .c12 { grid-column: span 12; }
+@media (max-width: 1280px) {
+  .dash-grid .c3 { grid-column: span 6; }
+  .dash-grid .c4, .dash-grid .c5, .dash-grid .c7, .dash-grid .c8 { grid-column: span 12; }
+}
+@media (max-width: 720px) {
+  .dash-grid .c3, .dash-grid .c6 { grid-column: span 12; }
+  body.dash .main { padding: 16px 14px 50px; }
+}
+
+.panel {
+  background: var(--d-panel);
+  border: 1px solid var(--d-line);
+  border-radius: 12px;
+  box-shadow: var(--d-panel-shadow);
+  padding: 16px 18px 18px;
+  min-width: 0; width: 100%;
+  display: flex; flex-direction: column;
+}
+/* KPI row: identical height whether or not the tile carries a delta line */
+.panel.tile { min-height: 104px; justify-content: center; }
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; row-gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.panel-head .toolbar { flex-wrap: nowrap; }
+.panel-head h2 {
+  margin: 0; font-size: 13px; font-weight: 650; color: var(--d-ink);
+  letter-spacing: .01em;
+}
+.panel-head .meta { font-size: 11.5px; color: var(--d-muted); font-variant-numeric: tabular-nums; }
+.panel-head .tabs { display: flex; gap: 14px; }
+.panel-head .tabs button {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 12px; color: var(--d-muted); font-family: inherit;
+}
+.panel-head .tabs button.on { color: var(--d-cyan); font-weight: 650; }
+
+/* ---------------- KPI tiles ---------------- */
+.kpi { display: flex; flex-direction: column; gap: 6px; text-align: center; }
+.kpi .n {
+  font-size: 30px; font-weight: 700; color: var(--d-ink);
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.kpi .l { font-size: 11.5px; color: var(--d-muted); }
+.kpi .delta { font-size: 11.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.kpi .delta.up { color: var(--d-green); }
+.kpi .delta.down { color: var(--d-red); }
+.panel.tile { padding: 15px 16px; flex-direction: row; align-items: center; gap: 14px; }
+.panel.tile .bar { width: 3px; align-self: stretch; border-radius: 3px; background: var(--d-blue); }
+.panel.tile.ok .bar { background: var(--d-green); }
+.panel.tile.fail .bar { background: var(--d-red); }
+.panel.tile.warn .bar { background: var(--d-amber); }
+.panel.tile.violet .bar { background: var(--d-violet); }
+
+/* ---------------- legend (donut side) ---------------- */
+.legend { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.legend-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12.5px; color: var(--d-ink);
+}
+.legend-row .dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.legend-row .txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legend-row .val { color: var(--d-muted); font-variant-numeric: tabular-nums; font-weight: 650; }
+
+/* ---------------- table ---------------- */
+table.dash-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.dash-tbl th {
+  text-align: center; font-weight: 600; font-size: 11px; color: var(--d-muted);
+  padding: 0 12px 10px 0; white-space: nowrap;
+}
+table.dash-tbl td {
+  padding: 11px 12px 11px 0; color: var(--d-ink);
+  border-top: 1px solid var(--d-line); white-space: nowrap;
+  text-align: center;
+}
+table.dash-tbl th.num, table.dash-tbl td.num {
+  text-align: center; font-variant-numeric: tabular-nums; padding-left: 18px;
+}
+table.dash-tbl th:last-child, table.dash-tbl td:last-child { padding-right: 0; }
+table.dash-tbl tbody tr:hover td { background: var(--d-panel-2); }
+table.dash-tbl a { color: var(--d-cyan); text-decoration: none; font-weight: 600; }
+table.dash-tbl a:hover { text-decoration: underline; }
+table.dash-tbl .money { color: var(--d-cyan); font-weight: 650; }
+.tbl-scroll { overflow-x: auto; }
+
+/* status pills, dark variants */
+body.dash .status-pill { font-size: 10.5px; padding: 2px 9px; }
+body.dash .status-pill.draft { background: rgba(130,150,180,.16); color: var(--d-muted); }
+body.dash .status-pill.pending_checker { background: rgba(227,179,65,.15); color: var(--d-amber); }
+body.dash .status-pill.approved { background: rgba(52,199,147,.15); color: var(--d-green); }
+body.dash .status-pill.rejected { background: rgba(240,101,92,.15); color: var(--d-red); }
+body.dash .status-pill.returned { background: rgba(39,144,188,.15); color: var(--d-cyan); }
+
+/* ---------------- ring row (per-product) ---------------- */
+.ring-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  gap: 8px;
+}
+.ring-row.compact { grid-template-columns: repeat(3, 1fr); }
+.ring-cell { text-align: center; min-width: 0; }
+.ring-cell .cap {
+  font-size: 11.5px; color: var(--d-ink); font-weight: 600;
+  margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ring-cell .box { height: 118px; }
+
+/* ---------------- controls on a dark surface ---------------- */
+body.dash .btn { text-decoration: none; }
+body.dash .btn.small { padding: 6px 12px; font-size: 12px; }
+body.dash .btn.secondary {
+  background: var(--d-panel-2); color: var(--d-ink); border-color: var(--d-line);
+}
+body.dash .btn.secondary:hover { background: var(--d-panel-2); }
+body.dash select,
+body.dash input[type="date"],
+body.dash input[type="number"] {
+  background: var(--d-panel-2); color: var(--d-ink);
+  border: 1px solid var(--d-line); border-radius: 7px;
+  padding: 6px 9px; font-size: 12px; font-family: inherit;
+}
+body.dash .toolbar { margin-bottom: 0; gap: 8px; }
+body.dash .toolbar input[type="date"] { width: 130px; }
+body.dash .toolbar select { width: auto; min-width: 190px; max-width: 260px; }
+body.dash .toolbar input[type="number"] { width: 76px; }
+body.dash .seg { display: flex; gap: 4px; background: var(--d-panel-2); padding: 3px; border-radius: 8px; }
+body.dash .seg a {
+  padding: 5px 11px; border-radius: 6px; font-size: 11.5px; font-weight: 600;
+  color: var(--d-muted); text-decoration: none;
+}
+body.dash .seg a.on { background: var(--d-blue); color: #fff; }
+body.dash .empty { color: var(--d-muted); font-size: 12.5px; margin: 4px 0 0; }
+body.dash .auth-err {
+  background: rgba(240,101,92,.12); border: 1px solid rgba(240,101,92,.35);
+  color: var(--d-red); border-radius: 8px; padding: 10px 12px; font-size: 12.5px;
+}
+
+/* ---------------- report data (SQL) ---------------- */
+.count-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; }
+.count-tile {
+  border: 1px solid var(--d-line); border-radius: 8px; background: var(--d-panel-2);
+  padding: 7px 11px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+.count-tile span {
+  font-size: 11px; color: var(--d-muted); font-family: ui-monospace, Menlo, monospace;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.count-tile b { font-size: 13px; color: var(--d-ink); font-variant-numeric: tabular-nums; }
+.count-tile.zero { opacity: .45; }
+.sql-query {
+  width: 100%; height: 62px; resize: vertical; margin-top: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; line-height: 1.5;
+  background: var(--d-code-bg); color: var(--d-code-ink);
+  border: 1px solid var(--d-line); border-radius: 8px; padding: 9px 11px;
+}
+.sql-query:focus { outline: none; border-color: var(--d-blue); }
+#q-result { margin-top: 12px; }
+#q-result .tbl-scroll { max-height: 360px; overflow: auto; }
+#q-result table.dash-tbl th { position: sticky; top: 0; background: var(--d-panel); }
+#q-result .null { color: var(--d-muted); opacity: .6; }

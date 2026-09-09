@@ -10,6 +10,7 @@
   var E = window.Engine;
 
   var fmt = E.formatCurrency;
+  var amt = E.formatAmount;      // CCRIS grid: bare numbers, no RM
   var fmtPct = E.formatPct;
   function num(v) { var n = parseFloat(String(v == null ? '' : v).replace(/[,\s%]/g, '')); return isFinite(n) ? n : 0; }
   function esc(s) {
@@ -236,8 +237,9 @@
     // Extracted rows (CCRIS/NLCI) are LOCKED - only the Override column
     // (and the Floating flag, an officer input for the PF stress test)
     // can be edited. Manually added rows stay fully editable.
-    // O/S, Limit and Instalment carry no "RM" - they sit under RM-headed
-    // columns and the editable rows show bare numbers too (data-fmt="money").
+    // Money columns carry no "RM" anywhere - not in the header, not in the
+    // cell. Every figure on this screen is ringgit, so repeating it 8 times
+    // per row is noise; the numbers stay right-aligned and tabular instead.
     function plainMoney(v) {
       var n = num(v);
       return n ? n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-';
@@ -325,7 +327,7 @@
       '<div class="dropzone" id="dz-experian">' +
       '<div class="dz-title">Experian report</div>' +
       '<div class="dz-sub">' + (pdfOk
-        ? 'Drop or click the Experian PDF.'
+        ? 'Drop or click'
         : 'PDF library missing - key the CCRIS rows in manually below.') +
       '</div><input type="file" id="file-experian" accept=".pdf" style="display:none"></div>' +
       '<div id="dz-experian-msg"></div>' +
@@ -335,24 +337,31 @@
         return '<option value="' + o + '">'; }).join('') + '</datalist>' +
       '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
       '<th>No</th><th>Date</th><th>Capacity</th><th>Collateral</th><th>Facility</th>' +
-      '<th>Outstanding (RM)</th><th>Limit (RM)</th><th>Legal Status</th>' +
-      '<th>Instalment per<br>CCRIS (RM)</th><th>Override (RM)</th>' +
-      '<th>Commitment (RM)</th><th>Floating Rate</th>' +
-      '<th>Stress Test Commitment (RM)</th><th>Source</th><th></th></tr></thead>' +
+      '<th class="num">Outstanding</th><th class="num">Limit</th><th>Legal Status</th>' +
+      '<th class="num">Instalment per<br>CCRIS</th><th class="num">Override</th>' +
+      '<th class="num">Commitment</th><th>Floating Rate</th>' +
+      '<th class="num">Stress Test<br>Commitment</th><th>Source</th><th></th></tr></thead>' +
       '<tbody id="ccris-tbody">' + rowsHtml + '</tbody>' +
       '<tfoot><tr class="total-row"><td colspan="10">Total CCRIS Commitment (L55)</td>' +
       '<td class="num" id="ccris-total">-</td><td></td>' +
       '<td class="num" id="ccris-stress-total">-</td><td colspan="2"></td></tr></tfoot></table></div>' +
       '<div style="margin-top:8px"><button class="btn small secondary" id="btn-add-ccris" type="button">+ Add CCRIS / other commitment row</button></div>' +
 
-      '<div class="subhead">Balance Transfer / Facilities To Be Settled</div>' +
-      '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
-      '<th>Type</th><th>Outstanding (RM)</th><th>Monthly Repayment (RM)</th><th></th>' +
-      '</tr></thead><tbody id="bt-tbody">' + btRows + '</tbody>' +
-      '<tfoot><tr class="total-row"><td colspan="2">Total To Be Settled (L56)</td>' +
-      '<td class="num" id="bt-total">-</td><td></td></tr>' +
-      '<tr class="total-row"><td colspan="2">Grand Total Commitment After Settlement (L57 = L55 - L56)</td>' +
-      '<td class="num" id="grand-total">-</td><td></td></tr></tfoot></table></div>' +
+      // Most cases have no balance transfer or settlement at all, so the
+      // table (and its two total rows) only appears once there is a row to
+      // put in it - otherwise Step B ends on the button alone. Nothing is
+      // lost while it is hidden: with no settlement L56 is zero and L57
+      // equals the L55 total already shown above.
+      '<div class="subhead" style="margin-top:26px">Balance Transfer / Facilities To Be Settled</div>' +
+      ((s.bt || []).length
+        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+          '<th>Type</th><th class="num">Outstanding</th><th class="num">Monthly Repayment</th><th></th>' +
+          '</tr></thead><tbody id="bt-tbody">' + btRows + '</tbody>' +
+          '<tfoot><tr class="total-row"><td colspan="2">Total To Be Settled (L56)</td>' +
+          '<td class="num" id="bt-total">-</td><td></td></tr>' +
+          '<tr class="total-row"><td colspan="2">Grand Total Commitment After Settlement (L57 = L55 - L56)</td>' +
+          '<td class="num" id="grand-total">-</td><td></td></tr></tfoot></table></div>'
+        : '') +
       '<div style="margin-top:8px"><button class="btn small secondary" id="btn-add-bt" type="button">+ Add settlement row</button></div>';
 
     // HF pages: each joint applicant gets a full "sub Step B" (own
@@ -406,7 +415,10 @@
         App.renderCCRIS(); App.refreshOutputs();
       }
     });
-    el('bt-tbody').addEventListener('input', function (ev) {
+    // absent whenever there are no settlement rows - the table is only
+    // rendered once App.state.bt has something in it
+    var btBody = el('bt-tbody');
+    if (btBody) btBody.addEventListener('input', function (ev) {
       var tr = ev.target.closest('tr'); if (!tr) return;
       var i = +tr.dataset.bti, f = ev.target.dataset.btf;
       if (f == null) return;
@@ -414,7 +426,7 @@
       if (f === 'type') { App.renderCCRIS(); }
       App.refreshOutputs();
     });
-    el('bt-tbody').addEventListener('click', function (ev) {
+    if (btBody) btBody.addEventListener('click', function (ev) {
       if (ev.target.dataset.btdel != null) {
         App.state.bt.splice(+ev.target.dataset.btdel, 1);
         App.renderCCRIS(); App.refreshOutputs();
@@ -512,7 +524,7 @@
 
     body += '<div class="dropzone" id="dz-income">' +
       '<div class="dz-title">Income documents</div>' +
-      '<div class="dz-sub">Drop or click. Payslip or EPF / KWSP PDF.</div>' +
+      '<div class="dz-sub">Drop or click &middot; payslip or EPF statement</div>' +
       '<input type="file" id="file-income" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" multiple style="display:none"></div>' +
       '<div id="dz-income-msg"></div><div id="income-files" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>';
 
@@ -585,14 +597,14 @@
     var d = epf.deductions;
     return '<div class="field narrow" style="margin-bottom:10px">' +
       '<label>EPF Rate (%)</label><input class="editable" type="text" inputmode="decimal" data-fmt="pct" id="epf-rate" value="' + esc(epf.epfRatePct) + '" min="1" max="30"></div>' +
-      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th>Month</th><th>Caruman Ahli (RM)</th><th>Implied Monthly Income (RM)</th></tr></thead>' +
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th>Month</th><th>Caruman Ahli</th><th>Implied Monthly Income</th></tr></thead>' +
       '<tbody id="epf-tbody">' + rows + '</tbody></table></div>' +
       '<div class="subhead">Deductions</div>' +
       '<div class="grid c4">' +
-      '<div class="field"><label>EPF (RM)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-edf="epf" value="' + esc(d.epf) + '"></div>' +
-      '<div class="field"><label>PCB / Zakat (RM)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-edf="pcb" value="' + esc(d.pcb) + '"></div>' +
-      '<div class="field"><label>SOCSO (RM)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-edf="socso" value="' + esc(d.socso) + '"></div>' +
-      '<div class="field"><label>Other (RM)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-edf="other" value="' + esc(d.other) + '"></div></div>';
+      '<div class="field"><label>EPF</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-edf="epf" value="' + esc(d.epf) + '"></div>' +
+      '<div class="field"><label>PCB / Zakat</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-edf="pcb" value="' + esc(d.pcb) + '"></div>' +
+      '<div class="field"><label>SOCSO</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-edf="socso" value="' + esc(d.socso) + '"></div>' +
+      '<div class="field"><label>Other</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" data-edf="other" value="' + esc(d.other) + '"></div></div>';
   }
 
   function renderBizmanForm() {
@@ -606,14 +618,14 @@
     return '<div class="grid c2" style="margin-bottom:10px">' +
       '<div class="field"><label>Bank Account I</label><input class="editable" id="biz-bank1" value="' + esc(b.bank1Name) + '" placeholder="Bank name"></div>' +
       '<div class="field"><label>Bank Account II</label><input class="editable" id="biz-bank2" value="' + esc(b.bank2Name) + '" placeholder="Bank name"></div></div>' +
-      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Month</th><th>Bank I Total Credit (RM)</th><th>Bank II Total Credit (RM)</th><th>Total (RM)</th></tr></thead>' +
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Month</th><th>Bank I Total Credit</th><th>Bank II Total Credit</th><th>Total</th></tr></thead>' +
       '<tbody id="biz-tbody">' + rows + '</tbody></table></div>' +
       '<div class="grid c4" style="margin-top:10px">' +
       '<div class="field"><label>Profit Margin (%)</label><input class="editable" type="text" inputmode="decimal" data-fmt="pct" id="biz-pm" value="' + esc(b.profitMarginPct) + '" min="0" max="100" step="0.01"></div>' +
       '<div class="field"><label>Shareholding (%)</label><input class="editable" type="text" inputmode="decimal" data-fmt="pct" id="biz-sh" value="' + esc(b.shareholdingPct) + '" min="0" max="100"></div>' +
-      '<div class="field"><label>Avg Latest 2 Years ITR (annual RM)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" id="biz-itr" value="' + esc(b.avgITRAnnual) + '"></div>' +
-      '<div class="field"><label>Tax Deduction LHDN (RM/mth)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" id="biz-tax" value="' + esc(b.taxDeduction) + '"></div>' +
-      '<div class="field"><label>SOCSO (RM/mth)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" id="biz-socso" value="' + esc(b.socso) + '"></div></div>';
+      '<div class="field"><label>Avg Latest 2 Years ITR (annual)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" id="biz-itr" value="' + esc(b.avgITRAnnual) + '"></div>' +
+      '<div class="field"><label>Tax Deduction LHDN (monthly)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" id="biz-tax" value="' + esc(b.taxDeduction) + '"></div>' +
+      '<div class="field"><label>SOCSO (monthly)</label><input class="editable" type="text" inputmode="decimal" data-fmt="money" id="biz-socso" value="' + esc(b.socso) + '"></div></div>';
   }
 
   function bindIncomeInputs() {
@@ -822,36 +834,37 @@
     var pm = el('print-meta');
     if (pm) pm.textContent =
       (s.customer.name || '-') + '  |  IC: ' + (E.formatIC(s.customer.ic) || '-') +
-      '  |  Printed: ' + new Date().toLocaleDateString('en-MY', { day: '2-digit', month: 'long', year: 'numeric' });
+      '  |  Printed: ' + new Date(Db.today() + 'T00:00:00Z')
+        .toLocaleDateString('en-MY', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
     // CCRIS per-line commitments (L) and stress-test commitments (T)
     s.ccris.forEach(function (row, i) {
       var cell = el('ccris-commit-' + i);
       var r = E.lineCommitment(row, s.customer.cardType);
       if (cell) {
-        cell.textContent = fmt(r.commitment);
+        cell.textContent = amt(r.commitment);
         cell.classList.toggle('override', r.overridden);
       }
       // Excel T: floating lines take the collateral uplift, others show L
       var sCell = el('ccris-stress-' + i);
       if (sCell) {
         var floating = String(row.floating || '').toUpperCase() === 'YES';
-        sCell.textContent = fmt(E.stressCommitment(
+        sCell.textContent = amt(E.stressCommitment(
           r.commitment, floating, E.stressFactorFor(row)));
         sCell.classList.toggle('stressed', floating);
       }
     });
     var tot = el('ccris-total');
-    if (tot) tot.textContent = fmt(c.totalCommitment);
+    if (tot) tot.textContent = amt(c.totalCommitment);
     var stot = el('ccris-stress-total');
-    if (stot) stot.textContent = fmt(c.stressTotal);
+    if (stot) stot.textContent = amt(c.stressTotal);
 
     (s.bt || []).forEach(function (row, i) {
       var cell = el('bt-rep-' + i);
-      if (cell) cell.textContent = fmt(E.btRepayment(row.outstanding));
+      if (cell) cell.textContent = amt(E.btRepayment(row.outstanding));
     });
-    var btT = el('bt-total'); if (btT) btT.textContent = fmt(c.btTotal);
-    var gt = el('grand-total'); if (gt) gt.textContent = fmt(c.grandTotal);
+    var btT = el('bt-total'); if (btT) btT.textContent = amt(c.btTotal);
+    var gt = el('grand-total'); if (gt) gt.textContent = amt(c.grandTotal);
 
     // income detail cells
     if (s.customer.type !== 'BIZMAN' && s.income.normalMode === 'EPF') {

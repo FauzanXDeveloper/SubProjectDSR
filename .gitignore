@@ -1,6 +1,13 @@
-# runtime database (created by bin/seed_admin.php / app/Db.php)
-storage/*.sqlite
-storage/*.sqlite-shm
-storage/*.sqlite-wal
-
 .DS_Store
+
+# Local database from the old PHP build. This file holds REAL data -
+# named user accounts with bcrypt password hashes, and customer cases
+# with full IC numbers, incomes and CCRIS credit records. The GitHub
+# repo is public: never commit it.
+storage/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Scratch/unrelated files
+node_modules/

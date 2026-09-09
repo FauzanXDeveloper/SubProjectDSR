@@ -12,7 +12,12 @@
   'use strict';
   var App = window.App = window.App || {};
   var E = window.Engine;
-  var fmt = E.formatCurrency;
+  // Every figure in this report is ringgit, so no cell carries an "RM"
+  // prefix - formatAmount renders bare, right-aligned, tabular numbers
+  // throughout. (formatCurrency, which prefixes RM, is still used on SCREEN
+  // for standalone figures; the report deliberately does not.)
+  var fmt = E.formatAmount;
+  var amt = E.formatAmount;
   var pct = E.formatPct;
   var DP = 2;   // DSR readings to 2 dp, matching the panels
 
@@ -77,7 +82,8 @@
      ============================================================ */
   function headerHtml(mode) {
     var s = App.state;
-    var printed = new Date().toLocaleDateString('en-MY', { day: '2-digit', month: 'long', year: 'numeric' });
+    var printed = new Date(Db.today() + 'T00:00:00Z')
+      .toLocaleDateString('en-MY', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' });
     return '<header class="rep-head">' +
       '<img class="rep-logo" src="public/alrajhi_logo.png" alt="Al Rajhi Bank Malaysia">' +
       '<div class="rep-head-txt">' +
@@ -193,14 +199,14 @@
       var stress = E.stressCommitment(lc.commitment, floating, E.stressFactorFor(r));
       return { cells: [
         String(i + 1), dash(r.date), dash(r.capacity), dash(r.collateral), dash(r.facility),
-        fmt(num(r.outstanding)), fmt(num(r.limit)), dash(r.legalStatus),
-        r.override !== '' && r.override != null ? fmt(num(r.override)) : '-',
-        fmt(lc.commitment), floating ? 'Yes' : 'No', fmt(stress)
+        amt(num(r.outstanding)), amt(num(r.limit)), dash(r.legalStatus),
+        r.override !== '' && r.override != null ? amt(num(r.override)) : '-',
+        amt(lc.commitment), floating ? 'Yes' : 'No', amt(stress)
       ] };
     });
     if (!dataRows.length) return '<p class="rep-empty">No CCRIS records captured.</p>';
-    var head = ['No', 'Date', 'Capacity', 'Collateral', 'Facility', 'Outstanding (RM)', 'Limit (RM)',
-      'Legal Status', 'Override (RM)', 'Commitment (RM)', 'Floating Rate', 'Stress Test Commitment (RM)'];
+    var head = ['No', 'Date', 'Capacity', 'Collateral', 'Facility', 'Outstanding', 'Limit',
+      'Legal Status', 'Override', 'Commitment', 'Floating Rate', 'Stress Test Commitment'];
     var th = head.map(function (h, i) { return '<th' + (i ? ' class="num"' : '') + '>' + esc(h) + '</th>'; }).join('');
     var body = dataRows.map(function (r) {
       return '<tr>' + r.cells.map(function (c2, i) {
@@ -209,10 +215,10 @@
     }).join('');
     // deduction + total rows, colspan-aligned like the on-screen CCRIS table
     body += '<tr><td colspan="9">Deduct Balance Transfer Commitment</td>' +
-      '<td class="num">(' + esc(fmt(c.btTotal)) + ')</td><td colspan="2"></td></tr>';
+      '<td class="num">(' + esc(amt(c.btTotal)) + ')</td><td colspan="2"></td></tr>';
     body += '<tr class="rep-total"><td colspan="9">TOTAL</td>' +
-      '<td class="num">' + esc(fmt(c.grandTotal)) + '</td><td></td>' +
-      '<td class="num">' + esc(fmt(c.stressTotal)) + '</td></tr>';
+      '<td class="num">' + esc(amt(c.grandTotal)) + '</td><td></td>' +
+      '<td class="num">' + esc(amt(c.stressTotal)) + '</td></tr>';
     return '<div class="rep-tbl-wrap"><table class="rep-tbl"><thead><tr>' + th + '</tr></thead>' +
       '<tbody>' + body + '</tbody></table></div>';
   }
@@ -226,13 +232,13 @@
     }).map(function (r, i) {
       var repayment = r.type === 'BT' ? E.btRepayment(num(r.outstanding)) : num(r.repayment);
       return { cells: [String(i + 1),
-        r.type === 'BT' ? fmt(num(r.outstanding)) : '-',
-        fmt(repayment)] };
+        r.type === 'BT' ? amt(num(r.outstanding)) : '-',
+        amt(repayment)] };
     });
     if (!rows.length) return '';
     return '<div class="rep-tbl-wrap" style="margin-top:10px">' +
       '<div class="rep-prod-h">Balance Transfer</div>' +
-      tableRows(['No', 'Amount (RM)', 'Minimum Payment (RM)'], rows) + '</div>';
+      tableRows(['No', 'Amount', 'Minimum Payment'], rows) + '</div>';
   }
 
   function commitmentsHtml() {
