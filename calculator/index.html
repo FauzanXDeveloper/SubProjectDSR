@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARBM Financing &amp; DSR Calculator</title>
+<link rel="icon" type="image/png" href="public/favicon.png">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/theme-dark.css">
+<link rel="stylesheet" href="css/login.css">
+<script src="js/core/theme.js"></script>
+</head>
+<body>
+
+<!-- ================= LOGIN (users are listed in data/users.js) ================= -->
+<div id="login-gate" class="login-gate">
+  <form id="login-form" class="login-card" autocomplete="off">
+    <img class="login-logo" src="public/alrajhi_logo.png" alt="Al Rajhi Bank Malaysia">
+    <h2>Financing &amp; DSR Calculator</h2>
+    <label>Username
+      <input id="login-user" type="text" autocomplete="username" required>
+    </label>
+    <label>Password
+      <input id="login-pass" type="password" autocomplete="current-password" required>
+    </label>
+    <div id="login-msg" class="login-msg" role="alert"></div>
+    <button type="submit" class="login-btn">Sign in</button>
+  </form>
+</div>
+
+<div class="layout">
+
+  <!-- ================= SIDEBAR ================= -->
+  <nav class="sidebar no-print" id="sidebar">
+    <div class="brand">
+      <span class="brand-logo">
+        <img class="logo-full" src="public/white_logo_alrajhi.png" alt="Al Rajhi Bank">
+        <img class="logo-mark" src="public/favicon.png" alt="Al Rajhi Bank">
+      </span>
+      <div class="brand-text">
+        <div class="t2">Financing &amp; DSR Calculator</div>
+      </div>
+    </div>
+
+    <div class="sidebar-scroll">
+      <!-- filled by js/core/app.js from the product list -->
+      <div id="sidebar-nav-section"></div>
+    </div>
+
+    <div class="foot">
+      <div class="foot-group">
+        <button id="btn-export" class="foot-row" type="button" title="Save this case to a JSON file">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/></svg>
+          <span class="nav-txt">Export case</span>
+        </button>
+        <button id="btn-import" class="foot-row" type="button" title="Open a case from a JSON file">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M4 17v3h16v-3"/></svg>
+          <span class="nav-txt">Import case</span>
+        </button>
+        <input id="import-file" type="file" accept=".json,application/json" hidden>
+        <button id="btn-print" class="foot-row" type="button" title="Print / Export PDF">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="1.5"/><rect x="6" y="15" width="12" height="6"/></svg>
+          <span class="nav-txt">Print / PDF</span>
+        </button>
+        <button id="btn-reset" class="foot-row" type="button" title="Reset all inputs">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/></svg>
+          <span class="nav-txt">Reset inputs</span>
+        </button>
+      </div>
+
+      <div class="foot-group foot-group-end">
+        <button id="btn-theme" class="foot-row" type="button"></button>
+        <button id="btn-collapse" class="foot-row" type="button" title="Collapse sidebar">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
+          <span class="nav-txt">Collapse</span>
+        </button>
+        <a href="#" id="calc-logout" class="foot-row" title="Logout">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          <span class="nav-txt">Logout</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ================= MAIN ================= -->
+  <main class="main">
+    <!-- shown only on Print / Export PDF -->
+    <div class="print-header">
+      <img src="public/alrajhi_logo.png" alt="Al Rajhi Bank Malaysia">
+      <div>
+        <div class="ph-title">Financing &amp; DSR Evaluation Report</div>
+        <div class="ph-sub" id="print-meta"></div>
+      </div>
+    </div>
+
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="hamburger no-print" id="btn-menu" type="button" aria-label="Menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <h1 id="page-title">Personal Financing (PF)</h1>
+      </div>
+      <div class="date" id="today-date"></div>
+    </div>
+
+    <!-- Shared intake: required first for every product -->
+    <div id="intake-customer"></div>
+    <div id="intake-ccris"></div>
+    <div id="intake-income"></div>
+
+    <!-- Gate message shown until minimum intake is complete -->
+    <div id="intake-gate"></div>
+
+    <!-- One panel per product is added here by js/core/app.js -->
+    <div id="product-panels"></div>
+
+    <!-- Combined decision summary (shown for standalone and combo views) -->
+    <div id="combined-panel"></div>
+
+    <footer class="app-foot no-print">
+      Copyright &copy; 2026 Al Rajhi Banking &amp; Investment Corporation (Malaysia) Bhd<br>
+      Built by Retail Credit Risk (RCR) since July 2026<br>
+      For internal credit evaluation use only.
+    </footer>
+  </main>
+</div>
+
+<!-- Printed evaluation report - hidden on screen, built on each print by js/core/report.js -->
+<div id="print-report" aria-hidden="true"></div>
+
+<!-- ================= SCRIPTS (order matters) ================= -->
+<script src="vendor/pdf.min.js"></script>
+
+<!-- engine: pure calculation functions, copied unchanged. config.js loads first. -->
+<script src="js/engine/config.js"></script>
+<script src="js/engine/pmt.js"></script>
+<script src="js/engine/age.js"></script>
+<script src="js/engine/facilityRates.js"></script>
+<script src="js/engine/ccrisLine.js"></script>
+<script src="js/engine/income.js"></script>
+<script src="js/engine/creditLimit.js"></script>
+<script src="js/engine/dsrThresholds.js"></script>
+<script src="js/engine/hfPricing.js"></script>
+<script src="js/engine/hfSummary.js"></script>
+<script src="js/engine/pdfExtractor.js"></script>
+<script src="data/ndiPricing.js"></script>
+<script src="data/users.js"></script>
+
+<!-- shared core -->
+<script src="js/core/ui.js"></script>
+<script src="js/core/state.js"></script>
+<script src="js/core/modal.js"></script>
+<script src="js/core/format.js"></script>
+<script src="js/core/applicants.js"></script>
+<script src="js/core/intake.js"></script>
+
+<!-- products: the list lives in js/products.js (one line per product folder) -->
+<script src="js/products.js"></script>
+<script>
+  DSR_PRODUCT_FILES.forEach(function (f) {
+    document.write('<script src="' + f + '"><\/script>');
+  });
+</script>
+
+<script src="js/core/decision.js"></script>
+<script src="js/core/report.js"></script>
+<script src="js/core/auth.js"></script>
+<script src="js/core/app.js"></script>
+</body>
+</html>
