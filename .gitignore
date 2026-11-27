@@ -11,3 +11,11 @@ storage/
 
 # Scratch/unrelated files
 node_modules/
+
+# Standalone calculator: the real login list holds working passwords and
+# the GitHub repo is public. Commit data/users.example.js instead.
+calculator/data/users.js
+
+# Per-session app snapshots taken before risky changes. They are local
+# recovery copies, not source, and may embed the local users file.
+backups/calculator_*.zip

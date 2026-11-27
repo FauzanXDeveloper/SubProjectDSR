@@ -1,0 +1,139 @@
+/* ---------------- dark theme ---------------- */
+
+[data-theme="dark"] {
+  /* ---------------- dark surfaces ---------------- */
+  --d-panel-2: #1C2C46;
+  --d-cyan: #38BDF8;
+  --d-track: #22344E;
+
+  /* ---------------- app tokens (css/styles.css) ---------------- */
+  --bg: #0E1826;
+  --panel: #16233A;
+  --text: #EAF0F8;
+  --ink: #EAF0F8;
+  --dark: #EAF0F8;
+  --muted: #8296B4;
+  --border: #26374F;
+  --border-strong: #33475F;
+  --primary: #4F8DE8;
+  --accent: #F0655C;
+  --gold: #E3B341;
+  --editable: var(--d-panel-2);
+  --editable-border: var(--border);
+  --readonly: #16273C;
+  --readonly-border: #2A4056;
+  --override: var(--d-panel-2);
+  --override-border: var(--border);
+  --ok: #34C793;
+  --ok-soft: rgba(52,199,147,.15);
+  --fail: #F0655C;
+  --fail-soft: rgba(240,101,92,.15);
+  --warn: #E3B341;
+  --warn-soft: rgba(227,179,65,.15);
+}
+
+/* ---------------- page shell ---------------- */
+[data-theme="dark"] body { background: var(--bg); color: var(--text); }
+[data-theme="dark"] .main { background: var(--bg); }
+[data-theme="dark"] .topbar h1 { color: var(--text); }
+[data-theme="dark"] .hamburger { background: var(--d-panel-2); }
+
+/* ---------------- cards ---------------- */
+[data-theme="dark"] .card {
+  background: var(--panel); border-color: var(--border);
+  box-shadow: none;
+}
+[data-theme="dark"] .card-head {
+  background: var(--d-panel-2); color: var(--text); border-color: var(--border);
+}
+[data-theme="dark"] .card-head span,
+[data-theme="dark"] .subhead { color: var(--text); }
+
+/* ---------------- forms ---------------- */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--d-panel-2); color: var(--text); border-color: var(--border);
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder { color: var(--muted); }
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus { border-color: var(--primary); }
+[data-theme="dark"] .field label { color: var(--muted); }
+
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); }
+[data-theme="dark"] option { background: var(--panel); color: var(--text); }
+
+[data-theme="dark"] .btn.secondary {
+  background: var(--d-panel-2); color: var(--text); border-color: var(--border-strong);
+}
+[data-theme="dark"] .btn.secondary:hover { background: var(--border); }
+
+/* ---------------- tables ---------------- */
+[data-theme="dark"] table.tbl th {
+  background: var(--d-panel-2); color: var(--text); border-bottom-color: var(--primary);
+}
+[data-theme="dark"] table.tbl td { background: var(--panel); border-color: var(--border); }
+[data-theme="dark"] table.tbl td.locked { background: #142035; color: var(--text); }
+[data-theme="dark"] table.tbl td.readonly { background: var(--readonly); color: var(--text); }
+[data-theme="dark"] table.tbl td.editable { background: transparent; }
+[data-theme="dark"] table.tbl td.override { background: transparent; }
+[data-theme="dark"] table.tbl td.src-cell { color: var(--muted); }
+[data-theme="dark"] table.tbl td select[data-btf="link"] { border-bottom-color: var(--border-strong); }
+[data-theme="dark"] table.tbl tr.sec-row td {
+  background: var(--d-panel-2); color: var(--muted);
+}
+[data-theme="dark"] table.tbl tr.total-row td {
+  background: var(--d-panel-2); color: var(--text);
+}
+[data-theme="dark"] table.tbl tr.src-NLCI td:not(.readonly) {
+  background: #1D1A26;
+}
+[data-theme="dark"] table.hoa-tbl td.hoa-lbl { background: var(--panel); color: var(--text); }
+[data-theme="dark"] table.hoa-tbl tr.hoa-emph td { background: var(--d-panel-2); }
+[data-theme="dark"] table.hoa-tbl td.hoa-total { background: var(--readonly); }
+/* ---------------- drop zones, panels, misc ---------------- */
+[data-theme="dark"] .dropzone { background: var(--d-panel-2); border-color: var(--border-strong); }
+[data-theme="dark"] .dropzone:hover { background: var(--readonly); border-color: var(--primary); }
+[data-theme="dark"] .cc-app, [data-theme="dark"] .pf-app,
+[data-theme="dark"] .tile { background: var(--d-panel-2); border-color: var(--border); }
+
+[data-theme="dark"] #pf-out, [data-theme="dark"] #hf-out, [data-theme="dark"] #cc-out,
+[data-theme="dark"] .result-card { background: var(--d-panel-2); border-color: var(--border); }
+[data-theme="dark"] .result-card .rc-title { color: var(--d-cyan, var(--primary)); }
+[data-theme="dark"] .tile.accent { background: var(--readonly); border-color: var(--readonly-border); }
+[data-theme="dark"] .tile.good { background: var(--ok-soft); border-color: rgba(52,199,147,.35); }
+[data-theme="dark"] .tile .t-value { color: var(--text); }
+[data-theme="dark"] .gauge { background: var(--d-track); }
+[data-theme="dark"] .notice { background: var(--d-panel-2); border-color: var(--border); color: var(--text); }
+[data-theme="dark"] .notice.info { background: var(--readonly); border-color: var(--readonly-border); color: var(--text); }
+
+[data-theme="dark"] .verdict.info { background: rgba(63,169,214,.16); color: #5CC0E8; border-color: rgba(63,169,214,.4); }
+
+/* ---------------- badges, verdicts, banners ---------------- */
+
+[data-theme="dark"] .card-head .step-tag {
+  background: rgba(227,179,65,.16); color: var(--gold);
+}
+[data-theme="dark"] .verdict.ok { border-color: rgba(52,199,147,.4); }
+[data-theme="dark"] .verdict.fail { border-color: rgba(240,101,92,.4); }
+[data-theme="dark"] .verdict.warn { border-color: rgba(227,179,65,.4); }
+[data-theme="dark"] .readonly-val { color: var(--text); }
+[data-theme="dark"] .combined-banner {
+  background: linear-gradient(135deg, #16233A 0%, #1C2C46 100%);
+  border: 1px solid var(--border); border-left: 3px solid var(--gold);
+}
+
+/* ---------------- sidebar edge shadow ---------------- */
+[data-theme="dark"] .sidebar {
+  box-shadow: 6px 0 18px -6px rgba(255, 255, 255, .22);
+}
+
+/* ---------------- the printed report stays on white paper ---------------- */
+@media print {
+  [data-theme="dark"] body,
+  [data-theme="dark"] .main,
+  [data-theme="dark"] .card,
+  [data-theme="dark"] table.tbl td { background: #fff !important; color: #1B2735 !important; }
+}

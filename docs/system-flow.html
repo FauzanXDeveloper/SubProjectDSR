@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OMNIONE Calculator — System Flow</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#f5f7fa;color:#0f172a;
+       font:14px/1.55 "Segoe UI",Inter,system-ui,-apple-system,sans-serif}
+  .bar{display:flex;align-items:center;gap:18px;padding:13px 24px;background:#fff;
+       border-bottom:1px solid #e4e8ef;position:sticky;top:0;z-index:9}
+  .bar h1{font-size:15px;margin:0;font-weight:700;letter-spacing:-.01em}
+  .bar .sub{font-size:12px;color:#64748b}
+  .spacer{flex:1}
+  button{font:inherit;font-size:12.5px;padding:7px 14px;border-radius:8px;
+         border:1px solid #dbe1ea;background:#fff;color:#0f172a;cursor:pointer}
+  button:hover{background:#f1f5f9}
+  button.primary{background:#0f172a;border-color:#0f172a;color:#fff}
+  button.primary:hover{background:#1e293b}
+  .wrap{padding:20px 24px 60px}
+  .card{background:#fff;border:1px solid #e4e8ef;border-radius:14px;padding:8px;overflow:auto}
+  #diagram{display:block;width:100%;height:auto;min-width:1100px}
+  .steps{max-width:1180px;margin:26px auto 0}
+  .steps h2{font-size:13px;text-transform:uppercase;letter-spacing:.09em;
+            color:#64748b;margin:0 0 12px 2px;font-weight:700}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+  .step{display:flex;gap:11px;background:#fff;border:1px solid #e4e8ef;
+        border-radius:11px;padding:12px 14px}
+  .step .n{flex:0 0 24px;height:24px;border-radius:50%;color:#fff;font-size:12px;
+           font-weight:700;display:flex;align-items:center;justify-content:center}
+  .step b{display:block;font-size:12.5px;margin-bottom:2px}
+  .step span{font-size:11.8px;color:#64748b;line-height:1.5}
+  .foot{max-width:1180px;margin:22px auto 0;font-size:12px;color:#64748b;
+        border-top:1px solid #e4e8ef;padding-top:14px}
+  .ep-back{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:50;
+           display:none;align-items:center;justify-content:center;padding:24px}
+  .ep-card{background:#fff;border-radius:14px;width:min(1000px,94vw);max-height:92vh;
+           display:flex;flex-direction:column;overflow:hidden;
+           box-shadow:0 20px 60px rgba(15,23,42,.35)}
+  .ep-head{display:flex;align-items:center;gap:12px;padding:13px 16px;
+           border-bottom:1px solid #e4e8ef}
+  .ep-head b{font-size:13px}
+  .ep-body{padding:14px 16px;overflow:auto}
+  .ep-body p{margin:0 0 10px;font-size:12.5px;color:#475569}
+  .ep-body img{display:block;width:100%;height:auto;border:1px solid #e4e8ef;border-radius:8px}
+  .ep-actions{display:flex;gap:8px;padding:12px 16px;border-top:1px solid #e4e8ef;background:#f8fafc}
+  .ep-actions a{font-size:12.5px;padding:7px 14px;border-radius:8px;border:1px solid #dbe1ea;
+                background:#fff;color:#0f172a;text-decoration:none;cursor:pointer}
+  .ep-actions a.primary{background:#0f172a;border-color:#0f172a;color:#fff}
+  @media print{
+    .bar,.foot{display:none}
+    body{background:#fff}
+    .card{border:0;padding:0}
+    #diagram{min-width:0}
+    .steps{page-break-before:always}
+  }
+  @page{size:A3 landscape;margin:10mm}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div>
+    <h1>OMNIONE Calculator — End-to-End System Flow</h1>
+    <div class="sub">Documents → business user → OMNIONE → CDE / underwriter → data warehouse</div>
+  </div>
+  <div class="spacer"></div>
+  <button id="btn-png">Download PNG</button>
+  <button id="btn-print" class="primary">Print / PDF</button>
+</div>
+
+<div class="wrap">
+  <div class="card"><svg id="diagram" xmlns="http://www.w3.org/2000/svg"></svg></div>
+
+  <section class="steps">
+    <h2>Step by step</h2>
+    <div class="grid" id="steps"></div>
+  </section>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+"use strict";
+
+var NS = "http://www.w3.org/2000/svg";
+
+/* ---- icon set: 24x24 solid paths ---- */
+var ICONS = {
+  person: "M12 12.3a4.2 4.2 0 1 0 0-8.4 4.2 4.2 0 0 0 0 8.4Zm0 1.8c-4 0-7.2 2.3-7.2 5.2V21h14.4v-1.7c0-2.9-3.2-5.2-7.2-5.2Z",
+  personLaptop: "M12 10.9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm0 1.5c-3.3 0-6 2-6 4.5v1.3h12v-1.3c0-2.5-2.7-4.5-6-4.5ZM2 19.6h20l-1.3 2.2H3.3Z",
+  doc: "M6.4 2h7.3L19.5 7v14.1a.9.9 0 0 1-.9.9H6.4a.9.9 0 0 1-.9-.9V2.9a.9.9 0 0 1 .9-.9Zm6.7 1.4v4.5h4.6Z",
+  payslip: "M5.5 2h13v20l-2.2-1.5-2.1 1.5-2.2-1.5-2.2 1.5-2.1-1.5L5.5 22Z",
+  docs: "M9 2h7l4 4v11H9V2Zm5.8 1.6v3.6h3.6ZM4 7h3v14h9v2H5a1 1 0 0 1-1-1Z",
+  folder: "M3 5.5a1 1 0 0 1 1-1h5.3l2 2.2H20a1 1 0 0 1 1 1v11.8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z",
+  cash: "M12 2.6a9.4 9.4 0 1 0 0 18.8 9.4 9.4 0 0 0 0-18.8Zm1.1 14.9v1.4h-2.1v-1.4c-1.6-.2-2.8-1-3.1-2.3l2-.7c.3.8 1 1.3 2.1 1.3 1 0 1.6-.4 1.6-1.1 0-.6-.4-1-1.7-1.3-2-.5-3.5-1.2-3.5-3.1 0-1.6 1.1-2.7 2.6-3V6.6h2.1v1.4c1.4.2 2.4 1 2.8 2l-1.9.8c-.3-.7-.9-1.1-1.9-1.1-.9 0-1.5.4-1.5 1 0 .6.5.9 1.8 1.2 2 .5 3.4 1.3 3.4 3.1 0 1.7-1.1 2.8-2.7 3.1Z",
+  link: "M9.9 14.1a4.4 4.4 0 0 0 6.2 0l2.3-2.3a4.4 4.4 0 1 0-6.2-6.2l-1.2 1.2 2 2 1.2-1.2a1.7 1.7 0 1 1 2.4 2.4l-2.3 2.3a1.7 1.7 0 0 1-2.4 0ZM14.1 9.9a4.4 4.4 0 0 0-6.2 0l-2.3 2.3a4.4 4.4 0 1 0 6.2 6.2l1.2-1.2-2-2-1.2 1.2a1.7 1.7 0 1 1-2.4-2.4l2.3-2.3a1.7 1.7 0 0 1 2.4 0Z",
+  upload: "M11 14.4V6.9L8.1 9.8 6.7 8.4 12 3.1l5.3 5.3-1.4 1.4L13 6.9v7.5ZM4 16.6h3.6v3.2h8.8v-3.2H20V22H4Z",
+  shield: "M12 2 4.4 5v6.5c0 4.9 3.2 9.1 7.6 10.6 4.4-1.5 7.6-5.7 7.6-10.6V5Z",
+  check: "M10.4 15.6 7.2 12.4l1.5-1.5 1.7 1.7 4.4-4.4 1.5 1.5Z",
+  calculator: "M6.2 2h11.6a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6.2a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm.9 2.4v4.2h9.8V4.4Zm.5 6.4h2.6v2.6H7.6Zm4.7 0h2.6v2.6h-2.6Zm-4.7 4.4h2.6V18H7.6Zm4.7 0h2.6V18h-2.6Z",
+  down: "M11 3h2v10.3l3.6-3.6 1.4 1.4-6 6-6-6 1.4-1.4L11 13.3ZM4 19h16v2H4Z",
+  send: "M2.4 20.9 21.9 12 2.4 3.1v6.7l13.2 2.2-13.2 2.2Z",
+  chip: "M6.8 2.6h10.4a4.2 4.2 0 0 1 4.2 4.2v10.4a4.2 4.2 0 0 1-4.2 4.2H6.8a4.2 4.2 0 0 1-4.2-4.2V6.8a4.2 4.2 0 0 1 4.2-4.2Zm2.4 4.8v9.2h9.2V7.4Z",
+  stamp: "M6 18.4h12V21H6ZM8.6 16.4l-.7-5.6h8.2l-.7 5.6ZM10 9V5.2a2 2 0 1 1 4 0V9Z",
+  database: "M12 2.4c4.4 0 8 1.5 8 3.4s-3.6 3.4-8 3.4-8-1.5-8-3.4 3.6-3.4 8-3.4Zm8 5.7v3.3c0 1.9-3.6 3.4-8 3.4s-8-1.5-8-3.4V8.1c1.6 1.4 4.6 2.2 8 2.2s6.4-.8 8-2.2Zm0 5.6v3.3c0 1.9-3.6 3.4-8 3.4s-8-1.5-8-3.4v-3.3c1.6 1.4 4.6 2.2 8 2.2s6.4-.8 8-2.2Z",
+  chart: "M4 20.2V9.4h3.6v10.8Zm6.2 0V3.8h3.6v16.4Zm6.2 0v-7.6H20v7.6Z",
+  globe: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 9h-2.8a16 16 0 0 0-1.5-5.6A8 8 0 0 1 18.9 11ZM12 4.1c1 1.3 1.9 3.7 2.1 6.9H9.9C10.1 7.8 11 5.4 12 4.1ZM9.4 5.4A16 16 0 0 0 7.9 11H5.1a8 8 0 0 1 4.3-5.6ZM5.1 13h2.8a16 16 0 0 0 1.5 5.6A8 8 0 0 1 5.1 13Zm4.8 0h4.2c-.2 3.2-1.1 5.6-2.1 6.9-1-1.3-1.9-3.7-2.1-6.9Zm4.7 5.6A16 16 0 0 0 16.1 13h2.8a8 8 0 0 1-4.3 5.6Z"
+};
+
+var DG = {
+  w: 1860,
+  h: 870,
+
+  zones: [
+    { x: 40,   y: 100, w: 300, h: 440, c: "#7c3aed", t: "CUSTOMER", s: "document source" },
+    { x: 370,  y: 100, w: 270, h: 440, c: "#0891b2", t: "BUSINESS USER", s: "PF / HF / CC team" },
+    { x: 670,  y: 100, w: 480, h: 720, c: "#0f766e", t: "OMNIONE CALCULATOR", s: "DSR system · part of the CDE", big: true },
+    { x: 1180, y: 100, w: 640, h: 720, c: "#c2410c", t: "DECISION & DATA", s: "CDE · underwriter · analytics" }
+  ],
+
+  nodes: [
+    /* customer */
+    { cx: 190, cy: 190, c: "#7c3aed", ic: "person", t: "Customer", s: "applies for financing" },
+    { cx: 100, cy: 360, c: "#7c3aed", ic: "doc",     t: "EPF / KWSP", s: "latest" },
+    { cx: 190, cy: 360, c: "#7c3aed", ic: "payslip", t: "Payslips",   s: "latest months" },
+    { cx: 280, cy: 360, c: "#7c3aed", ic: "docs",    t: "Other reports", s: "supporting" },
+
+    /* business user */
+    { cx: 505, cy: 250, c: "#0891b2", ic: "personLaptop", t: "Business user", s: "PF / HF / CC team" },
+
+    /* OMNIONE */
+    { cx: 910, cy: 190, c: "#0f766e", ic: "link",       t: "Call Experian API", s: "CCRIS + iScore" },
+    { cx: 910, cy: 298, c: "#0f766e", ic: "upload",     t: "Upload EPF / payslips", s: "any format" },
+    { cx: 910, cy: 406, c: "#0f766e", ic: "shield", det: "check", t: "Identity + fraud check", s: "name + IC match" },
+    { cx: 910, cy: 514, c: "#0f766e", ic: "cash",       t: "Financing input", s: "PF · CC · combo" },
+    { cx: 910, cy: 622, c: "#0f766e", ic: "calculator", t: "Calculate DSR", s: "DSR · NDI · instalment" },
+    { cx: 910, cy: 730, c: "#0f766e", ic: "send",       t: "Submit to checker", s: "snapshot + audit" },
+
+    /* decision & data */
+    { cx: 1300, cy: 190, c: "#c2410c", ic: "globe", t: "Experian", s: "CCRIS + iScore" },
+    { cx: 1420, cy: 420, c: "#c2410c", ic: "person", t: "Underwriter review", s: "no CDE — decides" },
+    { cx: 1420, cy: 620, c: "#dc2626", ic: "chip", t: "CDE", s: "live — decision via API", dashed: true, tag: "NEW" },
+    { cx: 1560, cy: 620, c: "#c2410c", ic: "person", t: "Underwriter", s: "double-checks CDE" },
+    { cx: 1700, cy: 620, c: "#c2410c", ic: "stamp", t: "Decision", s: "approve / reject / exception" },
+    { cx: 1620, cy: 750, c: "#c2410c", ic: "database", t: "Data warehouse", s: "case data" },
+    { cx: 1760, cy: 750, c: "#c2410c", ic: "chart", t: "BI", s: "dashboards" },
+
+    { cx: 1240, cy: 620, r: 38, diamond: true, c: "#c2410c", t: "CDE live?" }
+  ],
+
+  links: [
+    /* customer → documents */
+    { p: [[190,252],[190,337]] },
+    { p: [[190,290],[100,290],[100,337]] },
+    { p: [[190,290],[280,290],[280,337]] },
+
+    /* documents → business user */
+    { p: [[280,290],[355,290],[355,250],[482,250]] },
+
+    /* business user → OMNIONE */
+    { p: [[528,250],[645,250],[645,190],[887,190]] },
+
+    /* Experian → API */
+    { p: [[1277,190],[933,190]], c: "orange" },
+
+    /* OMNIONE pipeline */
+    { p: [[910,252],[910,275]] },
+    { p: [[910,360],[910,383]] },
+    { p: [[910,468],[910,491]] },
+    { p: [[910,576],[910,599]] },
+    { p: [[910,684],[910,707]] },
+
+    /* DSR burst → lower the amount */
+    { p: [[933,622],[1020,622],[1020,514],[933,514]], c: "amber", dash: true },
+
+    /* submit → decision diamond */
+    { p: [[933,730],[1165,730],[1165,620],[1202,620]], c: "orange" },
+
+    /* YES  */
+    { p: [[1278,620],[1397,620]], c: "orange" },
+    /* NO   */
+    { p: [[1240,582],[1240,420],[1397,420]], c: "orange" },
+
+    /* inside the two paths */
+    { p: [[1443,620],[1537,620]], c: "orange" },
+    { p: [[1583,620],[1677,620]], c: "orange" },
+    { p: [[1443,420],[1700,420],[1700,597]], c: "orange" },
+
+    /* decision → warehouse → BI */
+    { p: [[1700,680],[1700,705],[1620,705],[1620,727]], c: "teal" },
+    { p: [[1643,750],[1737,750]], c: "teal" }
+  ],
+
+  notes: [
+    { t: "YES", x: 1300, y: 610, c: "#0f766e", bold: true, size: 9.6 },
+    { t: "NO",  x: 1252, y: 500, c: "#b91c1c", bold: true, size: 9.6 },
+    { t: "No Experian report from the customer", x: 190, y: 470, c: "#7c3aed", italic: true, size: 9.6, anchor: "middle" },
+    { t: "if DSR bursts", x: 1032, y: 572, c: "#b45309", size: 9.4 },
+    { t: "lower the amount", x: 1032, y: 585, c: "#b45309", size: 9.4 }
+  ],
+
+  steps: [
+    { n: 1, c: "#7c3aed", t: "Customer provides documents",
+      d: "EPF / KWSP latest statement, payslips and other supporting reports. The customer does not supply an Experian report." },
+    { n: 2, c: "#0891b2", t: "Business user takes the case",
+      d: "The PF / HF / CC officer opens OMNIONE Calculator and carries the case from documents to submission." },
+    { n: 3, c: "#0f766e", t: "OMNIONE calls the Experian API",
+      d: "The system pulls the CCRIS report and iScore itself — no customer copy, no officer upload of a bureau report." },
+    { n: 4, c: "#0f766e", t: "Upload EPF / payslips",
+      d: "Drag & drop, any format. This is the only document input the officer makes." },
+    { n: 5, c: "#0f766e", t: "Identity + fraud check",
+      d: "The name and IC on the EPF or payslip must match the Experian report before the rows are accepted. EPF and payslips each get their own anti-fraud layer." },
+    { n: 6, c: "#0f766e", t: "Key in financing amount and tenure",
+      d: "PF, credit card or a combo — amount, tenure and rate. The only commercial input the officer decides." },
+    { n: 7, c: "#0f766e", t: "Calculate DSR",
+      d: "DSR, instalment, NDI and the verdict, from the same engine the Excel tools were built on." },
+    { n: 8, c: "#b45309", t: "DSR burst → lower the amount",
+      d: "If the case bursts the DSR ceiling the system reduces the financing amount and recalculates until it passes." },
+    { n: 9, c: "#0f766e", t: "Submit to checker",
+      d: "The case is snapshotted with a full audit trail and routed for checking." },
+    { n: 10, c: "#dc2626", t: "CDE live — decision from the CDE",
+      d: "The CDE takes the case from OMNIONE over API and returns its decision. What runs inside the CDE is out of scope here." },
+    { n: 11, c: "#c2410c", t: "Underwriter double-checks",
+      d: "The underwriter reviews the CDE outcome against the case before it is released." },
+    { n: 12, c: "#c2410c", t: "No CDE — underwriter decides",
+      d: "Without the CDE the underwriter reviews the case and gives the decision: approved, rejected, or an exception." },
+    { n: 13, c: "#0d9488", t: "Data warehouse feeds BI",
+      d: "Case and decision data from OMNIONE lands in the warehouse, which BI queries." }
+  ],
+
+  foot: "Solid tiles are live; dashed tiles are the target state. The CDE is shown as planned: when live it consumes the OMNIONE case over API and the underwriter only double-checks. Until then the underwriter decides. The Experian report is always pulled by the system — the customer never supplies it."
+};
+
+/* =====================================================================
+   renderer
+   ===================================================================== */
+
+var PAL = {
+  gray:   "#94a3b8",
+  orange: "#c2410c",
+  amber:  "#b45309",
+  teal:   "#0d9488"
+};
+
+function svgEl(tag, attrs, parent) {
+  var n = document.createElementNS(NS, tag);
+  if (attrs) Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+  if (parent) parent.appendChild(n);
+  return n;
+}
+
+function label(parent, x, y, text, attrs) {
+  var t = svgEl("text", Object.assign({ x: x, y: y }, attrs || {}), parent);
+  t.textContent = text;
+  return t;
+}
+
+/* polyline with rounded corners */
+function rounded(pts, r) {
+  if (pts.length < 2) return "";
+  var d = "M" + pts[0][0] + " " + pts[0][1];
+  for (var i = 1; i < pts.length - 1; i++) {
+    var p = pts[i], a = pts[i - 1], b = pts[i + 1];
+    var v1x = p[0] - a[0], v1y = p[1] - a[1];
+    var v2x = b[0] - p[0], v2y = b[1] - p[1];
+    var l1 = Math.sqrt(v1x * v1x + v1y * v1y) || 1;
+    var l2 = Math.sqrt(v2x * v2x + v2y * v2y) || 1;
+    var rr = Math.min(r, l1 / 2, l2 / 2);
+    var ax = p[0] - v1x / l1 * rr, ay = p[1] - v1y / l1 * rr;
+    var bx = p[0] + v2x / l2 * rr, by = p[1] + v2y / l2 * rr;
+    d += " L" + ax + " " + ay + " Q" + p[0] + " " + p[1] + " " + bx + " " + by;
+  }
+  var last = pts[pts.length - 1];
+  d += " L" + last[0] + " " + last[1];
+  return d;
+}
+
+function drawDefs(svg) {
+  var defs = svgEl("defs", {}, svg);
+  Object.keys(PAL).forEach(function (k) {
+    var m = svgEl("marker", {
+      id: "ar-" + k, viewBox: "0 0 8 8",
+      refX: "7.2", refY: "4", markerWidth: "6.5", markerHeight: "6.5",
+      orient: "auto"
+    }, defs);
+    svgEl("path", { d: "M0 0 L8 4 L0 8 Z", fill: PAL[k] }, m);
+  });
+}
+
+function drawHeader(svg) {
+  label(svg, 40, 46, "OMNIONE Calculator — End-to-End System Flow",
+    { "font-size": 21, "font-weight": 700, fill: "#0f172a", "letter-spacing": "-.02em" });
+  label(svg, 40, 70,
+    "Customer documents → business user → OMNIONE Calculator → CDE / underwriter → data warehouse",
+    { "font-size": 12, fill: "#64748b" });
+  label(svg, 1820, 44, "solid = live   ·   dashed = planned",
+    { "font-size": 11, fill: "#94a3b8", "text-anchor": "end" });
+  label(svg, 1820, 64, "v3 · Oct 2026",
+    { "font-size": 11, fill: "#cfd8e3", "text-anchor": "end" });
+}
+
+function drawZones(svg) {
+  var g = svgEl("g", {}, svg);
+  DG.zones.forEach(function (z) {
+    svgEl("rect", {
+      x: z.x, y: z.y, width: z.w, height: z.h, rx: 16,
+      fill: z.c, "fill-opacity": 0.028,
+      stroke: z.c, "stroke-opacity": 0.5,
+      "stroke-width": 1.4, "stroke-dasharray": "7 6"
+    }, g);
+    label(g, z.x + 18, z.y + 27, z.t, {
+      "font-size": z.big ? 14 : 11.5, "font-weight": 800, fill: z.c,
+      "letter-spacing": z.big ? ".6" : "1.05"
+    });
+    label(g, z.x + 18, z.y + 43, z.s, { "font-size": 10, fill: "#94a3b8" });
+  });
+}
+
+function drawLinks(svg) {
+  var g = svgEl("g", {}, svg);
+  DG.links.forEach(function (l) {
+    var key = l.c || "gray";
+    svgEl("path", {
+      d: rounded(l.p, 7),
+      fill: "none", stroke: PAL[key], "stroke-width": 1.6,
+      "stroke-linecap": "round", "stroke-linejoin": "round",
+      "stroke-dasharray": l.dash ? "6 5" : "none",
+      "marker-end": "url(#ar-" + key + ")",
+      opacity: 0.9
+    }, g);
+  });
+}
+
+function drawNotes(svg) {
+  var g = svgEl("g", {}, svg);
+  (DG.notes || []).forEach(function (n) {
+    label(g, n.x, n.y, n.t, {
+      "font-size": n.size || 9.5,
+      "font-weight": n.bold ? 800 : 400,
+      "font-style": n.italic ? "italic" : "normal",
+      "letter-spacing": n.bold ? ".8" : "0",
+      "text-anchor": n.anchor || "start",
+      fill: n.c
+    });
+  });
+}
+
+function drawIcon(parent, n, tile, tx, ty, solid) {
+  var size = tile * 0.56;
+  var k = size / 24;
+  var tf = "translate(" + (tx + (tile - size) / 2) + "," + (ty + (tile - size) / 2) + ") scale(" + k + ")";
+  svgEl("path", {
+    d: ICONS[n.ic], fill: solid ? "#fff" : n.c,
+    "fill-rule": "evenodd", transform: tf
+  }, parent);
+  if (n.det && ICONS[n.det]) {
+    svgEl("path", {
+      d: ICONS[n.det], fill: solid ? n.c : "#fff",
+      "fill-rule": "evenodd", transform: tf
+    }, parent);
+  }
+}
+
+function drawNodes(svg) {
+  var g = svgEl("g", {}, svg);
+
+  DG.nodes.forEach(function (n) {
+    var grp = svgEl("g", {}, g);
+
+    if (n.diamond) {
+      var r = n.r || 38;
+      svgEl("polygon", {
+        points: [[n.cx, n.cy - r], [n.cx + r, n.cy], [n.cx, n.cy + r], [n.cx - r, n.cy]]
+          .map(function (p) { return p.join(","); }).join(" "),
+        fill: "#fff", stroke: n.c, "stroke-width": 1.6
+      }, grp);
+      label(grp, n.cx, n.cy + 4, n.t, {
+        "font-size": 10, "font-weight": 700, fill: n.c, "text-anchor": "middle"
+      });
+      return;
+    }
+
+    var t = 46;
+    var tx = n.cx - t / 2, ty = n.cy - t / 2;
+
+    if (n.dashed) {
+      svgEl("rect", {
+        x: tx, y: ty, width: t, height: t, rx: 11,
+        fill: "#fff", stroke: n.c, "stroke-width": 1.6, "stroke-dasharray": "5 4"
+      }, grp);
+    } else {
+      svgEl("rect", { x: tx, y: ty, width: t, height: t, rx: 11, fill: n.c }, grp);
+    }
+
+    drawIcon(grp, n, t, tx, ty, !n.dashed);
+
+    var lines = Array.isArray(n.t) ? n.t : [n.t];
+    var ly = n.cy + 38;
+    lines.forEach(function (ln, i) {
+      label(grp, n.cx, ly + i * 13, ln, {
+        "font-size": 11.4, "font-weight": 700, fill: "#1f2937", "text-anchor": "middle"
+      });
+    });
+    if (n.s) {
+      label(grp, n.cx, ly + (lines.length - 1) * 13 + 14, n.s, {
+        "font-size": 9.4, fill: "#7b8794", "text-anchor": "middle"
+      });
+    }
+
+    if (n.tag) {
+      var w = 12 + n.tag.length * 5.8;
+      var ty2 = n.cy - 45;
+      svgEl("rect", { x: n.cx - w / 2, y: ty2, width: w, height: 16, rx: 8, fill: n.c }, grp);
+      label(grp, n.cx, ty2 + 11.4, n.tag, {
+        "font-size": 8.6, "font-weight": 800, fill: "#fff",
+        "text-anchor": "middle", "letter-spacing": ".6"
+      });
+    }
+  });
+}
+
+function drawLegend(svg) {
+  var g = svgEl("g", {}, svg);
+  var x = 40, y = 560, w = 600, h = 260;
+
+  svgEl("rect", {
+    x: x, y: y, width: w, height: h, rx: 13,
+    fill: "#fff", stroke: "#e4e8ef", "stroke-width": 1
+  }, g);
+
+  label(g, x + 20, y + 27, "LEGEND", {
+    "font-size": 10, "font-weight": 800, fill: "#64748b", "letter-spacing": "1.1"
+  });
+
+  var cx1 = x + 24, cx2 = x + 310;
+  var r1 = y + 68, r2 = y + 124, r3 = y + 180;
+
+  /* solid tile */
+  svgEl("rect", { x: cx1, y: r1 - 15, width: 26, height: 26, rx: 7, fill: "#0f766e" }, g);
+  label(g, cx1 + 38, r1 + 4, "component (live)", { "font-size": 11, fill: "#334155" });
+
+  /* dashed tile */
+  svgEl("rect", { x: cx2, y: r1 - 15, width: 26, height: 26, rx: 7,
+    fill: "#fff", stroke: "#dc2626", "stroke-width": 1.5, "stroke-dasharray": "5 4" }, g);
+  label(g, cx2 + 38, r1 + 4, "planned (CDE)", { "font-size": 11, fill: "#334155" });
+
+  /* arrows */
+  [["gray", "data flow"], ["orange", "CDE / decision path"]].forEach(function (r, i) {
+    var yy = r2 + i * 0;
+    var cxx = i === 0 ? cx1 : cx2;
+    svgEl("path", { d: "M" + cxx + " " + yy + " L" + (cxx + 34) + " " + yy,
+      fill: "none", stroke: PAL[r[0]], "stroke-width": 1.6,
+      "marker-end": "url(#ar-" + r[0] + ")" }, g);
+    label(g, cxx + 46, yy + 4, r[1], { "font-size": 11, fill: "#334155" });
+  });
+
+  /* dashed amber */
+  svgEl("path", { d: "M" + cx1 + " " + r3 + " L" + (cx1 + 34) + " " + r3,
+    fill: "none", stroke: PAL.amber, "stroke-width": 1.6, "stroke-dasharray": "6 5",
+    "marker-end": "url(#ar-amber)" }, g);
+  label(g, cx1 + 46, r3 + 4, "amount reduced (loop)", { "font-size": 11, fill: "#334155" });
+
+  /* teal */
+  svgEl("path", { d: "M" + cx2 + " " + r3 + " L" + (cx2 + 34) + " " + r3,
+    fill: "none", stroke: PAL.teal, "stroke-width": 1.6,
+    "marker-end": "url(#ar-teal)" }, g);
+  label(g, cx2 + 46, r3 + 4, "analytics feed", { "font-size": 11, fill: "#334155" });
+
+  /* zone boundary */
+  svgEl("rect", { x: cx1, y: r3 + 30, width: 38, height: 22, rx: 6,
+    fill: "#f8fafc", stroke: "#94a3b8", "stroke-width": 1.2, "stroke-dasharray": "5 4" }, g);
+  label(g, cx1 + 50, r3 + 46, "system boundary", { "font-size": 11, fill: "#334155" });
+}
+
+function drawDiagram() {
+  var svg = document.getElementById("diagram");
+  svg.setAttribute("viewBox", "0 0 " + DG.w + " " + DG.h);
+  svg.setAttribute("width", DG.w);
+  svg.setAttribute("height", DG.h);
+  svg.setAttribute("role", "img");
+  svg.innerHTML = "";
+
+  svgEl("rect", { x: 0, y: 0, width: DG.w, height: DG.h, fill: "#ffffff" }, svg);
+
+  var title = svgEl("title", {}, svg);
+  title.textContent = "OMNIONE Calculator system flow";
+
+  drawDefs(svg);
+  drawHeader(svg);
+  drawZones(svg);
+  drawLinks(svg);
+  drawNodes(svg);
+  drawNotes(svg);
+  drawLegend(svg);
+}
+
+/* =====================================================================
+   page wiring
+   ===================================================================== */
+
+function renderStepList() {
+  var grid = document.getElementById("steps");
+  grid.innerHTML = "";
+  DG.steps.forEach(function (s) {
+    var card = document.createElement("div");
+    card.className = "step";
+
+    var num = document.createElement("div");
+    num.className = "n";
+    num.style.background = s.c;
+    num.textContent = s.n;
+
+    var body = document.createElement("div");
+    var head = document.createElement("b");
+    head.textContent = s.t;
+    var text = document.createElement("span");
+    text.textContent = s.d;
+    body.appendChild(head);
+    body.appendChild(text);
+
+    card.appendChild(num);
+    card.appendChild(body);
+    grid.appendChild(card);
+  });
+
+  document.getElementById("foot").textContent = DG.foot;
+}
+
+function exportPanel() {
+  if (exportPanel.node) return exportPanel.node;
+
+  var back = document.createElement("div");
+  back.className = "ep-back";
+  back.innerHTML =
+    '<div class="ep-card">' +
+      '<div class="ep-head"><b id="ep-title">PNG ready</b>' +
+        '<span style="flex:1"></span>' +
+        '<button id="ep-close">Close</button></div>' +
+      '<div class="ep-body"><p id="ep-hint"></p><div id="ep-img"></div></div>' +
+      '<div class="ep-actions">' +
+        '<a id="ep-png" class="primary" download="omnione-system-flow.png">Save PNG</a>' +
+        '<a id="ep-svg" download="omnione-system-flow.svg">Save SVG (vector)</a>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(back);
+  exportPanel.node = back;
+
+  document.getElementById("ep-close").addEventListener("click", function () {
+    back.style.display = "none";
+  });
+  back.addEventListener("click", function (e) {
+    if (e.target === back) back.style.display = "none";
+  });
+
+  return back;
+}
+
+function showExportPanel(pngUrl, svgUrl) {
+  var back = exportPanel();
+  var holder = document.getElementById("ep-img");
+  holder.innerHTML = "";
+  var img = document.createElement("img");
+  img.alt = "OMNIONE Calculator system flow";
+  img.src = pngUrl;
+  holder.appendChild(img);
+
+  document.getElementById("ep-png").href = pngUrl;
+  document.getElementById("ep-svg").href = svgUrl;
+  document.getElementById("ep-title").textContent = "PNG ready — " + (DG.w * 2) + " × " + (DG.h * 2);
+  document.getElementById("ep-hint").innerHTML =
+    "If the download did not start automatically, click <b>Save PNG</b> — " +
+    "or right-click the image and choose <b>Save image as…</b>.";
+
+  back.style.display = "flex";
+}
+
+function downloadPng() {
+  var svg = document.getElementById("diagram");
+  var clone = svg.cloneNode(true);
+  clone.setAttribute("xmlns", NS);
+
+  var markup = new XMLSerializer().serializeToString(clone);
+  var svgUrl = URL.createObjectURL(new Blob([markup], { type: "image/svg+xml;charset=utf-8" }));
+  var img = new Image();
+
+  img.onload = function () {
+    var k = 2;
+    var canvas = document.createElement("canvas");
+    canvas.width = DG.w * k;
+    canvas.height = DG.h * k;
+
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    var pngUrl;
+    try {
+      pngUrl = canvas.toDataURL("image/png");
+    } catch (e) {
+      alert("This browser blocked the image export (" + e.name + "). Use Print / PDF instead.");
+      return;
+    }
+
+    try {
+      var a = document.createElement("a");
+      a.href = pngUrl;
+      a.download = "omnione-system-flow.png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (e) { /* ignored — the panel covers it */ }
+
+    showExportPanel(pngUrl, svgUrl);
+  };
+
+  img.onerror = function () {
+    alert("Could not rasterise the diagram in this browser — use Print / PDF instead.");
+  };
+
+  img.src = svgUrl;
+}
+
+function init() {
+  drawDiagram();
+  renderStepList();
+  document.getElementById("btn-png").addEventListener("click", downloadPng);
+  document.getElementById("btn-print").addEventListener("click", function () { window.print(); });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>
+

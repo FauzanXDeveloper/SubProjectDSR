@@ -1,0 +1,219 @@
+/* ============================================================
+   app.css - chrome for the client-rendered pages (login, dashboard,
+   case list, admin). Dashboard/Cases/Admin/Users/Audit Log/Settings
+   all share the SAME .layout/.sidebar/.nav-item components the
+   calculator (web/index.html) already uses, via js/chrome.js - one
+   sidebar language for the whole authenticated app. This file only
+   adds what styles.css doesn't cover: the content-area helpers
+   below, auth pages, stat tiles, tables.
+   ============================================================ */
+
+/* calculator page (web/index.html) AND the shared sidebar foot
+   (js/chrome.js): case/account links, styled to match the
+   existing .sidebar .foot button rules */
+/* (the anchor rule that used to live here was for the multi-page app; the
+   calculator's own .foot-row in styles.css styles both buttons and links) */
+.sidebar .user-chip { font-size: 11px; color: rgba(255,255,255,.55); text-transform: capitalize; padding: 0 2px; }
+
+/* calculator sidebar (web/index.html) when viewing an existing case:
+   Standalone/Combo mode buttons are swapped for this instead (the mode
+   is fixed by whoever submitted the case, so switching it here isn't
+   a real action) */
+.case-info-chip {
+  margin: 0 16px 6px; padding: 12px; border-radius: 10px;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14);
+}
+.case-info-chip .ref { font-size: 12.5px; font-weight: 700; color: #fff; margin-bottom: 8px; word-break: break-all; }
+
+.app-shell { max-width: 1140px; margin: 0 auto; }
+.app-shell h1 { font-size: 19px; margin: 0 0 4px; }
+.app-shell .sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+
+/* ============================================================
+   auth pages (login.html, change_password.html) - a slow-drifting
+   animated gradient mesh (brand navy/gold/sky, blurred radial blobs
+   easing back and forth on staggered loops) behind a true glass
+   (frosted, translucent) login card. No video/image asset to host -
+   pure CSS, loops forever, degrades to a static gradient for
+   prefers-reduced-motion.
+   ============================================================ */
+.auth-wrap {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 20px; position: relative; overflow: hidden;
+  background: radial-gradient(120% 120% at 50% 0%, #123A5E 0%, #081B30 60%, #050F1E 100%);
+}
+.auth-bg-blob {
+  position: absolute; border-radius: 50%; filter: blur(90px);
+  opacity: .6; pointer-events: none; will-change: transform;
+}
+.auth-bg-blob.b1 {
+  width: 620px; height: 620px; top: -180px; left: -140px;
+  background: radial-gradient(circle at 35% 35%, #2C7DC2, transparent 70%);
+  animation: authBlob1 26s ease-in-out infinite;
+}
+.auth-bg-blob.b2 {
+  width: 560px; height: 560px; bottom: -200px; right: -140px;
+  background: radial-gradient(circle at 55% 45%, #C89B3C, transparent 70%);
+  animation: authBlob2 32s ease-in-out infinite;
+}
+.auth-bg-blob.b3 {
+  width: 500px; height: 500px; top: 28%; left: 55%;
+  background: radial-gradient(circle at 50% 50%, #3FA9CE, transparent 70%);
+  animation: authBlob3 22s ease-in-out infinite;
+}
+@keyframes authBlob1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(90px, 70px) scale(1.15); }
+}
+@keyframes authBlob2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-80px, -60px) scale(1.1); }
+}
+@keyframes authBlob3 {
+  0%, 100%  { transform: translate(-50%, 0) scale(1); }
+  33%       { transform: translate(-40%, -70px) scale(1.08); }
+  66%       { transform: translate(-60%, 50px) scale(.92); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-bg-blob { animation: none; }
+}
+/* dim + darken slightly so the glass card keeps enough contrast over
+   the busiest blob overlaps */
+.auth-wrap::before {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(4,20,40,.2), rgba(4,20,40,.42));
+}
+
+.auth-box {
+  position: relative; z-index: 1; min-width: 0; box-sizing: border-box;
+  background: rgba(255,255,255,.72);
+  -webkit-backdrop-filter: blur(34px) saturate(160%);
+  backdrop-filter: blur(34px) saturate(160%);
+  border: 1px solid rgba(255,255,255,.85);
+  border-radius: 20px; width: 100%; max-width: 388px;
+  padding: 34px 30px 28px;
+  box-shadow: 0 24px 60px rgba(4,20,40,.35), 0 1px 0 rgba(255,255,255,.8) inset;
+  animation: authRise .5s cubic-bezier(.2,.9,.3,1.1) both;
+}
+@keyframes authRise {
+  from { opacity: 0; transform: translateY(18px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-box { animation: none; }
+}
+/* backdrop-filter isn't supported on every browser (older Firefox/
+   Android WebView) - fall back to a near-opaque card so the form
+   stays fully legible rather than see-through-and-unreadable */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .auth-box { background: rgba(255,255,255,.94); }
+}
+
+.auth-box .abrand { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 22px; }
+.auth-box .abrand img { height: 36px; }
+.auth-box .abrand .t { font-weight: 700; color: var(--dark); font-size: 14px; text-align: center; line-height: 1.35; }
+.auth-box h1.auth-title { margin: 0 0 4px; font-size: 20px; font-weight: 800; color: var(--dark); text-align: center; letter-spacing: -.01em; }
+.auth-box .auth-sub { margin: 0 0 22px; font-size: 12.5px; color: var(--muted); text-align: center; }
+
+.auth-box label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 14px 0 6px; }
+.auth-field { position: relative; }
+.auth-field svg {
+  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); pointer-events: none; transition: color .15s;
+}
+.auth-box input[type=text], .auth-box input[type=password] {
+  width: 100%; padding: 11px 12px 11px 38px; border: 1.5px solid var(--border-strong, var(--border));
+  border-radius: 10px; background: #fff;
+  font-size: 14px; box-sizing: border-box;
+  transition: border-color .15s, box-shadow .15s;
+}
+.auth-box input[type=text]:focus, .auth-box input[type=password]:focus {
+  outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(15,76,129,.13);
+}
+.auth-field:focus-within svg { color: var(--primary); }
+
+/* The auth screens (login, first-admin setup, change password) keep their
+   own left-aligned form styling. The centred field convention in
+   styles.css is for the calculator and its tables - it must not reach in
+   here, where the inputs are icon-prefixed and read as normal text. */
+.auth-box input, .auth-box select, .auth-box textarea { text-align: left; }
+.auth-box label { text-align: left; }
+
+.auth-box .btn {
+  width: 100%; margin-top: 22px; justify-content: center; padding: 11px 14px;
+  border-radius: 10px; font-size: 14.5px;
+  background: linear-gradient(135deg, var(--primary), #0C3E69 120%);
+  box-shadow: 0 10px 24px rgba(15,76,129,.38);
+}
+.auth-box .btn:hover { box-shadow: 0 14px 30px rgba(15,76,129,.46); }
+
+.auth-err {
+  background: var(--fail-soft, #FBE4E1); color: var(--fail); border: 1px solid #E4A9A4;
+  padding: 9px 11px; border-radius: 8px; font-size: 12.5px; margin-top: 14px;
+  animation: authShake .32s;
+}
+@keyframes authShake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+.auth-foot { margin-top: 20px; text-align: center; font-size: 11.5px; color: var(--muted); }
+.auth-foot a { color: var(--primary); font-weight: 600; text-decoration: none; }
+.auth-foot a:hover { text-decoration: underline; }
+
+/* stat tiles (dashboard / admin dashboard) - colourful KPI cards */
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 14px; margin-bottom: 22px; }
+.stat-tile {
+  background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px;
+  transition: transform .15s, box-shadow .15s;
+}
+.stat-tile:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(16,32,48,.12); }
+.stat-tile .stat-icon {
+  width: 32px; height: 32px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(15,76,129,.1); color: var(--primary); margin-bottom: 12px;
+}
+.stat-tile .n { font-size: 27px; font-weight: 800; color: var(--dark); font-variant-numeric: tabular-nums; line-height: 1; }
+.stat-tile .l { font-size: 12px; color: var(--muted); margin-top: 7px; font-weight: 600; }
+
+.stat-tile.ok, .stat-tile.fail, .stat-tile.warn, .stat-tile.info { color: #fff; border: none; }
+.stat-tile.ok .n, .stat-tile.fail .n, .stat-tile.warn .n, .stat-tile.info .n { color: #fff; }
+.stat-tile.ok .l, .stat-tile.fail .l, .stat-tile.warn .l, .stat-tile.info .l { color: rgba(255,255,255,.88); }
+.stat-tile.ok .stat-icon, .stat-tile.fail .stat-icon, .stat-tile.warn .stat-icon, .stat-tile.info .stat-icon {
+  background: rgba(255,255,255,.22); color: #fff;
+}
+.stat-tile.ok   { background: linear-gradient(135deg,#22A866,#0F7A46 120%); box-shadow: 0 10px 22px rgba(15,122,70,.28); }
+.stat-tile.fail { background: linear-gradient(135deg,#E15850,#B3261E 120%); box-shadow: 0 10px 22px rgba(179,38,30,.26); }
+.stat-tile.warn { background: linear-gradient(135deg,#EDB24A,#B5790F 120%); box-shadow: 0 10px 22px rgba(150,105,15,.26); }
+.stat-tile.info { background: linear-gradient(135deg,#2790BC,#0F4C81 120%); box-shadow: 0 10px 22px rgba(15,76,129,.28); }
+.stat-tile.ok:hover, .stat-tile.fail:hover, .stat-tile.warn:hover, .stat-tile.info:hover { box-shadow: 0 16px 30px rgba(0,0,0,.22); }
+
+/* status pill for case lists (reuses verdict color tokens) */
+.status-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.status-pill.draft { background: var(--readonly); color: var(--dark); }
+.status-pill.pending_checker { background: var(--warn-soft); color: var(--warn); }
+.status-pill.approved { background: var(--ok-soft); color: var(--ok); }
+.status-pill.rejected { background: var(--fail-soft); color: var(--fail); }
+/* returned = sent back to the maker for amendment; deliberately not a
+   fail colour, the case is still alive and just sitting in the other court */
+.status-pill.returned { background: #E4EFF5; color: #1F6F92; }
+
+table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.data th, table.data td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: center; }
+table.data th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+table.data td.num, table.data th.num { text-align: center; font-variant-numeric: tabular-nums; }
+table.data tr:hover td { background: var(--bg); }
+table.data a { color: var(--primary); font-weight: 600; text-decoration: none; }
+table.data a:hover { text-decoration: underline; }
+
+.toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+.pagination { display: flex; gap: 6px; margin-top: 14px; }
+.pagination a, .pagination span { padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; text-decoration: none; color: var(--text); }
+.pagination a:hover { background: var(--bg); }
+.pagination .cur { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* ---------------- admin dashboard charts (ApexCharts, vendored) ---------------- */
+.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+.chart-box { width: 100%; }
+.chart-box .apexcharts-legend-text { color: var(--text) !important; }

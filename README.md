@@ -1,5 +1,10 @@
 # ARBM Unified Financing & DSR Calculator
 
+> **Standalone calculator build:** [`calculator/`](calculator/README.md) is a separate,
+> self-contained version of this system for evaluation only — double-click `index.html`,
+> no server, no admin, no maker/checker, nothing stored in the browser. It is independent
+> of the `web/` app described below.
+
 Fully static web app: plain HTML + CSS + vanilla JS (**no build step, no
 server, no framework runtime**). The calculation engine (`web/js/engine/`)
 is pure, framework-free JS, unit-tested against the master Excel workbooks.
