@@ -87,6 +87,7 @@ function applicantHtml() {
     var s = App.state, c = App.computed;
     var basis = s.customer.type === 'BIZMAN' ? 'Business (ITR)'
       : (s.income.normalMode === 'EPF' ? 'EPF / KWSP statement' : 'Salary / Payslip');
+    var v2 = App.customerDetailsV2;
     return section('Applicant', dl([
       ['Name', dash(s.customer.name)],
       ['NRIC', dash(E.formatIC(s.customer.ic))],
@@ -96,7 +97,13 @@ function applicantHtml() {
       ['Class', dash(s.customer.cardType)],
       ['iScore', dash(s.iScore)],
       ['Report Date', dash(s.reportDate)],
-      ['Income Source', basis]
+      ['Income Source', basis],
+      ['Nature of Employment', dash(v2 && s.customer.natureOfEmployment
+        ? (v2.natureLabel(s.customer.natureOfEmployment) || s.customer.natureOfEmployment) : '')],
+      ['Number of Household', dash(v2 && s.customer.householdSize
+        ? v2.householdLabel(s.customer.householdSize) : s.customer.householdSize)],
+      ['Workplace Location', dash(v2 && s.customer.workplaceLocation
+        ? (v2.workplaceLabel(s.customer.workplaceLocation) || s.customer.workplaceLocation) : '')]
     ], 3));
   }
 
@@ -243,7 +250,8 @@ function applicantHtml() {
         ['Amount', fmt(num(amount))],
         ['Tenure', num(tenure) ? num(tenure) + ' months' : '-'],
         ['Profit Rate', res.rateFrac != null ? pct(res.rateFrac, 2) : '-'],
-        ['Instalment', fmt(res.instalment)]
+        ['Instalment', fmt(res.instalment)],
+        ['PF Aggregated (no BT)', fmt(res.pfAggregate.totalPF)]
       ], 3) + '</div>';
   }
   function hfBlock(res) {
@@ -278,6 +286,11 @@ function applicantHtml() {
         ['New Commitment', fmt(r.newCommitment)],
         ['Net Disposable Income (NDI)', fmt(r.ndi)],
         ['New DSR', pct(r.newDSR, DP)],
+        ['Net Income with Assumed Increment (v2)', fmt(r.assumedNetIncome)],
+        ['Revised Stress NDI (v2)', fmt(r.stressNdiV2)],
+        ['Existing PF (no BT)', fmt(r.pfAggregate.existingPF)],
+        ['New PF (this application)', fmt(r.pfAggregate.newPF)],
+        ['PF Aggregated (no BT)', fmt(r.pfAggregate.totalPF)],
         ['Stress Test Combined Instalment', fmt(r.stressCommit)],
         ['Stress Net Disposable Income (Stress NDI)', fmt(r.stressNdi)],
         ['Stress Test DSR (%)', pct(r.stressDSR, DP)],

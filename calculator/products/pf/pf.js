@@ -99,6 +99,9 @@
       tile('Existing Commitment', fmt(r.existing)) +
       tile('New DSR', fmtPct(r.dsr, DSR_DP)) +
       tile('NDI', fmt(r.ndi), r.ndi >= r.ndiMin ? 'good' : 'accent') +
+      tile('Assumed Net Income (v2)', fmt(r.assumedNetIncome)) +
+      tile('Stress NDI (v2)', fmt(r.stressNdiV2), r.enh.applied ? 'accent' : '') +
+      tile('PF Aggregated (no BT)', fmt(r.pfAggregate.totalPF)) +
       '</div>';
   }
 
@@ -188,6 +191,21 @@ App.computePF = function () {
     var stressNdi = c.netIncome - stressCommit;
     var sv = E.pfStressVerdict(c.grossIncome, stressDSR);
 
+    /* ---- v2 enhancement (additive) ---- */
+    var enh = E.ndiV2.compute({
+      netIncome: c.netIncome,
+      ndi: ndi,
+      location: s.customer.workplaceLocation,
+      household: s.customer.householdSize
+    });
+
+    var pfAgg = E.pfAggregate.compute({
+      rows: s.ccris,
+      btList: s.bt,
+      cardType: s.customer.cardType,
+      newInstalment: newInst
+    });
+
     return {
       riskGrade: riskGrade, product: rates.product,
       flatRate: rates.flat, eprRate: rates.epr,
@@ -200,7 +218,14 @@ App.computePF = function () {
       stressCommit: stressCommit, stressDSR: stressDSR, stressNdi: stressNdi,
       stressVerdict: rateMissing ? E.VERDICT.NOT_ELIGIBLE
         : (gate !== E.VERDICT.OK ? gate : sv.verdict),
-      stressThreshold: sv.threshold
+      stressThreshold: sv.threshold,
+
+      /* v2 enhancement outputs - new keys, existing values untouched. */
+      enh: enh,
+      assumedNetIncome: enh.assumedNetIncome,
+      stressNdiV2: enh.stressNdiV2,
+      costPct: enh.costPct,
+      pfAggregate: pfAgg
     };
   };
 
@@ -232,6 +257,29 @@ App.computePF = function () {
     var verdict = rateFrac == null ? E.VERDICT.NOT_ELIGIBLE
       : (gate !== E.VERDICT.OK ? gate : v.verdict);
 
+    /* ---- v2 enhancement (additive) ---- */
+    var applicantRows = App.state.ccris;
+    var applicantBt = App.state.bt;
+    if (pfApp.applicant !== 'MAIN') {
+      var jointState = App.state.hfJoint[pfApp.applicant] || {};
+      applicantRows = jointState.ccris || [];
+      applicantBt = jointState.bt || [];
+    }
+
+    var enh = E.ndiV2.compute({
+      netIncome: pers.net,
+      ndi: ndi,
+      location: App.state.customer.workplaceLocation,
+      household: App.state.customer.householdSize
+    });
+
+    var pfAgg = E.pfAggregate.compute({
+      rows: applicantRows,
+      btList: applicantBt,
+      cardType: cardType,
+      newInstalment: instalment
+    });
+
     return {
       app: pfApp, applicant: pfApp.applicant, name: applicantName(pfApp.applicant),
       personal: pers, iScore: iScore, riskGrade: riskGrade,
@@ -239,7 +287,13 @@ App.computePF = function () {
       deviationUsed: deviation > 0, rateFrac: rateFrac,
       amount: amount, months: months, gate: gate, instalment: instalment,
       existing: existing, newCommitment: newCommitment, dsr: dsr, ndi: ndi,
-      threshold: v.threshold, ndiMin: v.ndiMin, verdict: verdict
+      threshold: v.threshold, ndiMin: v.ndiMin, verdict: verdict,
+
+      enh: enh,
+      assumedNetIncome: enh.assumedNetIncome,
+      stressNdiV2: enh.stressNdiV2,
+      costPct: enh.costPct,
+      pfAggregate: pfAgg
     };
   };
 
@@ -318,7 +372,40 @@ App.computePF = function () {
       '<div class="tile-grid">' +
       tile('New Commitment Unsecured', fmt(r.unsecCommit)) +
       tile('New DSR Unsecured (%)', fmtPct(r.unsecDSR, DSR_DP)) +
-      '</div></div>';
+      '</div></div>' +
+
+      /* ---------- v2 enhancement (additive) ---------- */
+      '<div class="result-card v2">' +
+      '<div class="rc-head"><span class="rc-title">NDI Enhancement (v2)</span>' +
+      '<span class="v2-chip">NEW</span></div>' +
+      (r.enh.applied ? '' :
+        '<div class="notice">Set Workplace Location and Number of Household in Step A to ' +
+        'calculate the v2 figures. The legacy NDI and stress test above are unchanged.</div>') +
+      '<div class="tile-grid">' +
+      tile('Net Income with Assumed Increment', fmt(r.assumedNetIncome)) +
+      tile('Revised Stress NDI (v2)', fmt(r.stressNdiV2), r.enh.applied ? 'accent' : '') +
+      tile('Cost of Living Factor', r.enh.applied ? (r.costPct).toFixed(4) + '%' : '-') +
+      tile('Workplace Location', App.customerDetailsV2
+        ? (App.customerDetailsV2.workplaceLabel(App.state.customer.workplaceLocation) || '-') : '-') +
+      tile('Household', App.customerDetailsV2
+        ? (App.customerDetailsV2.householdLabel(App.state.customer.householdSize) || '-') : '-') +
+      '</div>' +
+      '<div class="v2-compare">Legacy Stress NDI (v1): <b>' + fmt(r.stressNdi) +
+      '</b> &nbsp;&middot;&nbsp; Revised Stress NDI (v2): <b>' + fmt(r.stressNdiV2) + '</b></div>' +
+      '</div>' +
+
+      '<div class="result-card">' +
+      '<div class="rc-head"><span class="rc-title">PF Aggregated (without BT)</span></div>' +
+      '<div class="tile-grid">' +
+      tile('Existing PF', fmt(r.pfAggregate.existingPF)) +
+      tile('New PF (this application)', fmt(r.pfAggregate.newPF)) +
+      tile('PF Aggregated', fmt(r.pfAggregate.totalPF), 'accent') +
+      tile('PF Aggregated &#247; Net Income', App.computed.netIncome > 0
+        ? fmtPct(r.pfAggregate.totalPF / App.computed.netIncome, DSR_DP) : '-') +
+      '</div>' +
+      '<div class="v2-compare">Facilities counted: ' + esc(r.pfAggregate.facilities.join(', ')) +
+      ' &nbsp;&middot;&nbsp; no balance-transfer netting applied.</div>' +
+      '</div>';
   };
 
   App.registerProduct({
