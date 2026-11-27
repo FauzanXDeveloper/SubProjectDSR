@@ -179,7 +179,8 @@ App.renderCustomer = function () {
       '<div class="field"><label>Customer Class</label>' +
       '<span class="readonly-val" id="cust-cardtype">' + esc(c.cardType) + '</span></div>' +
       lastField +
-      '</div>';
+      '</div>' +
+      (App.customerDetailsV2 ? App.customerDetailsV2.html() : '');
     el('intake-customer').innerHTML = card('card-customer', 'STEP A', 'Customer Details', body);
 
     var nameInp = el('cust-name');
@@ -215,6 +216,8 @@ App.renderCustomer = function () {
       App.renderCC();
       App.refreshOutputs();
     };
+
+    if (App.customerDetailsV2) App.customerDetailsV2.bind();
   };
 
   var CAPACITIES = ['OWN', 'JOINT', 'GUARANTOR', 'DIRECTOR'];
@@ -927,6 +930,21 @@ App.renderCCRIS = function () {
     try {
       var res = await E.extractFromExperian(file);
       var s = App.state;
+
+      /* Once an application form is loaded it is the identity reference. */
+      var appFormMismatch = App.customerDetailsV2
+        ? App.customerDetailsV2.validateExperian(res) : '';
+      if (appFormMismatch) {
+        App.modal.alert(
+          'The application form on file belongs to a different person:\n\n' +
+          appFormMismatch + '\n\nNothing was loaded. Upload the Experian report for ' +
+          'the applicant named on the form, or clear the form first.',
+          { type: 'error', title: 'Experian report rejected' });
+        dzState('dz-experian', 'error', 'Report rejected - identity does not match the ' +
+          'application form: ' + esc(appFormMismatch.replace(/\n/g, ' | ')) +
+          '. Nothing was loaded; existing rows are unchanged.');
+        return;
+      }
 
       var preMismatch = loadedIncomeMismatch(s, res.name, res.icNumber);
       if (preMismatch) {

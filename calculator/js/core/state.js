@@ -53,7 +53,23 @@ function defaultState() {
         name: '', ic: '', type: 'NORMAL', segment: '',
         cardType: 'TYPE A',
 
-        fromExperian: false
+        fromExperian: false,
+
+        /* v2 enhancement: application form + three policy fields. */
+        fromAppForm: false,
+        appForm: null,
+        natureOfEmployment: '',
+        natureOfEmploymentOther: '',
+        householdSize: '',
+        workplaceLocation: '',
+        workplaceLocationOther: '',
+        companyAddress: '',
+        companyPostcode: '',
+        companyTown: '',
+        companyState: '',
+        geoPostcode: '',
+        geoMethod: '',
+        geoConfidence: ''
       },
       iScore: '',
       reportDate: '',
