@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NDI Enhancement (v2) - verification</title>
+<style>
+  body { font-family: "Segoe UI", system-ui, Arial, sans-serif; margin: 28px; color: #1B2735; }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  h2 { font-size: 14px; margin: 26px 0 6px; border-bottom: 1px solid #E2E7EE; padding-bottom: 4px; }
+  p { font-size: 13px; color: #64748B; margin: 0 0 8px; }
+  table { border-collapse: collapse; margin: 8px 0 4px; font-size: 13px; }
+  th, td { border: 1px solid #E2E7EE; padding: 5px 10px; text-align: right; white-space: nowrap; }
+  th { background: #F2F5F9; font-weight: 600; text-align: right; }
+  td:first-child, th:first-child { text-align: left; }
+  .pass { color: #1B7A46; font-weight: 600; }
+  .fail { color: #B3261E; font-weight: 600; }
+  .summary { margin-top: 20px; padding: 10px 14px; border-radius: 6px; font-size: 14px; }
+  .summary.ok { background: #E7F4EC; color: #1B7A46; }
+  .summary.bad { background: #FBEAE8; color: #B3261E; }
+</style>
+</head>
+<body>
+
+<h1>NDI Enhancement (v2) - calculation verification</h1>
+<p>Expected values are hard-coded from the policy memo. Every row must read PASS before the build is accepted.
+   Legacy NDI and stress rules are included as regression checks.</p>
+
+<div id="out"></div>
+
+<script src="../js/engine/config.js"></script>
+<script src="../data/geo/myPostcodes.js"></script>
+<script src="../js/engine/geoLookup.js"></script>
+<script src="../js/engine/facilityRates.js"></script>
+<script src="../js/engine/ccrisLine.js"></script>
+<script src="../js/engine/dsrThresholds.js"></script>
+<script src="../js/engine/ndiV2.js"></script>
+<script src="../js/engine/pfAggregate.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  var out = document.getElementById('out');
+  var pass = 0;
+  var fail = 0;
+
+  function money(n) { return Number(n).toFixed(2); }
+  function close(actual, expected) { return Math.abs(Number(actual) - Number(expected)) <= 0.005; }
+
+  function h2(text) { out.insertAdjacentHTML('beforeend', '<h2>' + text + '</h2>'); }
+
+  function render(headers, rows) {
+    var html = '<table><thead><tr>' + headers.map(function (h) {
+      return '<th>' + h + '</th>';
+    }).join('') + '</tr></thead><tbody>';
+    rows.forEach(function (row) {
+      html += '<tr>' + row.map(function (cell) { return '<td>' + cell + '</td>'; }).join('') + '</tr>';
+    });
+    out.insertAdjacentHTML('beforeend', html + '</tbody></table>');
+  }
+
+  function check(actual, expected) {
+    var ok = close(actual, expected);
+    if (ok) pass++; else fail++;
+    return '<span class="' + (ok ? 'pass' : 'fail') + '">' + (ok ? 'PASS' : 'FAIL') +
+      ' (' + money(actual) + ')' + '</span>';
+  }
+
+  function checkText(actual, expected) {
+    var ok = String(actual) === String(expected);
+    if (ok) pass++; else fail++;
+    return '<span class="' + (ok ? 'pass' : 'fail') + '">' + (ok ? 'PASS' : 'FAIL') +
+      ' ("' + actual + '")' + '</span>';
+  }
+
+  /* ---------------- 1. Stress NDI cost factors ---------------- */
+  h2('1. Revised Stress NDI - NDI RM2,250.00');
+  var cases = [
+    ['Urban', 'urban', '1', 2081.475],
+    ['Urban', 'urban', '2', 2008.470],
+    ['Urban', 'urban', '3', 1969.254],
+    ['Urban', 'urban', '4', 1947.144],
+    ['Sub-Urban', 'suburban', '1', 2080.125],
+    ['Sub-Urban', 'suburban', '2', 2022.300],
+    ['Sub-Urban', 'suburban', '3', 1997.396],
+    ['Sub-Urban', 'suburban', '4', 1972.832]
+  ];
+  render(['Location', 'Household', 'Cost factor', 'Stress NDI', 'Result'], cases.map(function (c) {
+    var r = Engine.ndiV2.compute({ netIncome: 5000, ndi: 2250, location: c[1], household: c[2] });
+    return [c[0], c[2] === '4' ? '4 and above' : c[2], (r.costPct).toFixed(4) + '%',
+      money(r.stressNdiV2), check(r.stressNdiV2, c[3])];
+  }));
+
+  /* ---------------- 2. Assumed increment ---------------- */
+  h2('2. Net Income with Assumed Increment - net income RM4,500.00');
+  var incCases = [
+    ['Urban', 'urban', 4710.60],
+    ['Sub-Urban', 'suburban', 4668.30]
+  ];
+  render(['Location', 'Multiplier', 'Assumed net income', 'Result'], incCases.map(function (c) {
+    var r = Engine.ndiV2.compute({ netIncome: 4500, ndi: 2000, location: c[1], household: '1' });
+    return [c[0], r.incrementFactor.toFixed(4), money(r.assumedNetIncome), check(r.assumedNetIncome, c[2])];
+  }));
+
+  /* ---------------- 3. Bucket resolution ---------------- */
+  h2('3. Workplace location resolution (postcode / address)');
+  var geoCases = [
+    ['55200', 'Chan Sow Lin, Kuala Lumpur', 'Malaysia', 'WP_KUALA_LUMPUR'],
+    ['62000', 'Putrajaya', 'Malaysia', 'WP_PUTRAJAYA'],
+    ['46000', 'Petaling Jaya', 'Malaysia', 'PETALING_JAYA'],
+    ['47500', 'Subang Jaya', 'Malaysia', 'SUBANG_JAYA'],
+    ['40000', 'Shah Alam', 'Malaysia', 'SHAH_ALAM'],
+    ['10450', 'Pulau Pinang', 'Malaysia', 'PENANG_ISLAND'],
+    ['12000', 'Butterworth', 'Malaysia', 'OTHERS'],
+    ['80200', 'Johor Bahru', 'Malaysia', 'JOHOR_BAHRU'],
+    ['31400', 'Ipoh, Perak', 'Malaysia', 'OTHERS'],
+    ['', 'Marina Bay, Singapore', 'Singapore', 'OUTSIDE_MALAYSIA'],
+    ['', 'CHAN SOW LIN, KUALA LUMPUR', 'Malaysia', 'WP_KUALA_LUMPUR']
+  ];
+  render(['Postcode', 'Address', 'Country', 'Bucket', 'Result'], geoCases.map(function (c) {
+    var r = Engine.geo.resolveWorkplace({ postcode: c[0], address: c[1], country: c[2] });
+    return [c[0] || '-', c[1], c[2], r.bucket, checkText(r.bucket, c[3])];
+  }));
+
+  /* ---------------- 4. PF aggregate without BT ---------------- */
+  h2('4. PF Aggregated without BT - existing PF + new PF');
+  var rows = [
+    { facility: 'PELNFNCE', date: '01/01/2025', capacity: 'OWN', outstanding: 10000, limit: 0,
+      commitmentPerCCRIS: 300, override: '' },
+    { facility: 'CRDTCARD', date: '01/01/2025', capacity: 'OWN', outstanding: 5000, limit: 5000,
+      commitmentPerCCRIS: 0, override: '50' },
+    { facility: 'PELNFNSA', date: '02/02/2025', capacity: 'OWN', outstanding: 8000, limit: 0,
+      commitmentPerCCRIS: 200, override: '150' }
+  ];
+  var btList = [
+    { type: 'SETTLE', outstanding: 8000, repayment: '150', link: {
+      i: 2, facility: 'PELNFNSA', date: '02/02/2025', prevOverride: '', mirrored: '150'
+    } }
+  ];
+  var agg = Engine.pfAggregate.compute({
+    rows: rows, btList: btList, cardType: 'TYPE A', newInstalment: 1050
+  });
+  render(['Metric', 'Value', 'Expected', 'Result'], [
+    ['Existing PF (pre-BT)', money(agg.existingPF), '500.00', check(agg.existingPF, 500)],
+    ['New PF (this application)', money(agg.newPF), '1050.00', check(agg.newPF, 1050)],
+    ['PF Aggregated', money(agg.totalPF), '1550.00', check(agg.totalPF, 1550)]
+  ]);
+
+  /* ---------------- 5. Legacy rules unchanged ---------------- */
+  h2('5. Regression - legacy NDI thresholds and stress test unchanged');
+  var pfA = Engine.pfVerdict(4000, 'TYPE A', 0.55, 1500);
+  var pfB = Engine.pfVerdict(8000, 'TYPE B', 0.72, 1600);
+  var stress = Engine.pfStressVerdict(8000, 0.68);
+  render(['Check', 'Value', 'Expected', 'Result'], [
+    ['Type A threshold (0.60)', pfA.threshold.toFixed(2), '0.60', check(pfA.threshold, 0.60)],
+    ['Type A verdict at 55% (OK)', pfA.verdict, 'OK', checkText(pfA.verdict, 'OK')],
+    ['Type A NDI floor still 2000', '1500 vs 2000', 'ndiOk false',
+      '<span class="' + (pfA.ndiOk === false ? 'pass' : 'fail') + '">' +
+      (pfA.ndiOk === false ? 'PASS' : 'FAIL') + '</span>'],
+    ['Type B 5k-10k threshold (0.70)', pfB.threshold.toFixed(2), '0.70', check(pfB.threshold, 0.70)],
+    ['Stress threshold under 10k (0.70)', stress.threshold.toFixed(2), '0.70', check(stress.threshold, 0.70)]
+  ]);
+
+  var box = document.createElement('div');
+  box.className = 'summary ' + (fail ? 'bad' : 'ok');
+  box.textContent = fail
+    ? (fail + ' check(s) FAILED, ' + pass + ' passed.')
+    : ('All ' + pass + ' checks passed.');
+  out.appendChild(box);
+})();
+</script>
+</body>
+</html>
