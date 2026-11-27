@@ -1,92 +1,130 @@
-/* ============================================================
-   format.js - display formatting for numeric inputs.
-   Inputs carry data-fmt="money" | "pct" | "int" | "ic":
-     money -> 1,234,567.89   pct -> 4.25%   int -> 1,234
-     ic    -> 900101-01-5566 (Malaysian IC, via Engine.formatIC)
-   Focus shows the raw value for editing; blur (or Enter) formats
-   it and pushes the value through the normal input pipeline. All
-   engine num() parsers strip commas/%/dashes so the formatted
-   strings stay calculation-safe.
-   ============================================================ */
+/* ---------------- input formatting ---------------- */
+
 (function () {
   'use strict';
-  var App = window.App = window.App || {};
 
-  function raw(v) { return String(v == null ? '' : v).replace(/[,\s%-]/g, ''); }
+  var CalculatorApp = window.App = window.App || {};
 
-  /** Format a stored value for display inside an input. */
-  function fmtInput(v, kind) {
-    if (kind === 'ic') return window.Engine ? window.Engine.formatIC(v) : String(v == null ? '' : v);
-    var r = raw(v);
-    if (r === '') return '';
-    var n = parseFloat(r);
-    if (!isFinite(n)) return String(v);
+  function removeFormatting(value) {
+    return String(value == null ? '' : value).replace(/[,\s%-]/g, '');
+  }
+
+  function formatInputValue(value, kind) {
+    if (kind === 'ic') {
+      return window.Engine ? window.Engine.formatIC(value) : String(value == null ? '' : value);
+    }
+
+    var rawValue = removeFormatting(value);
+    if (rawValue === '') {
+      return '';
+    }
+
+    var number = parseFloat(rawValue);
+    if (!isFinite(number)) {
+      return String(value);
+    }
+
     if (kind === 'money') {
-      return n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return number.toLocaleString('en-MY', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
     }
+
     if (kind === 'pct') {
-      return n.toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 4 }) + '%';
+      return number.toLocaleString('en-MY', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 4
+      }) + '%';
     }
+
     if (kind === 'int') {
-      return n.toLocaleString('en-MY', { maximumFractionDigits: 0 });
+      return number.toLocaleString('en-MY', { maximumFractionDigits: 0 });
     }
-    return String(v);
-  }
-  App.fmtInput = fmtInput;
-  App.rawNum = raw;
 
-  // focus: show the raw number and select it for quick replacement
-  document.addEventListener('focusin', function (ev) {
-    var t = ev.target;
-    if (!t || !t.dataset || !t.dataset.fmt) return;
-    var r = raw(t.value);
-    if (r !== t.value) t.value = r;
-    if (t.select) setTimeout(function () { try { t.select(); } catch (e) {} }, 0);
+    return String(value);
+  }
+
+  CalculatorApp.fmtInput = formatInputValue;
+  CalculatorApp.rawNum = removeFormatting;
+
+  document.addEventListener('focusin', function (event) {
+    var target = event.target;
+    if (!target || !target.dataset || !target.dataset.fmt) {
+      return;
+    }
+
+    var rawValue = removeFormatting(target.value);
+    if (rawValue !== target.value) {
+      target.value = rawValue;
+    }
+
+    if (target.select) {
+      setTimeout(function () {
+        try { target.select(); } catch (error) {  }
+      }, 0);
+    }
   });
 
-  // blur: format and push the value through the normal input pipeline
-  document.addEventListener('focusout', function (ev) {
-    var t = ev.target;
-    if (!t || !t.dataset || !t.dataset.fmt) return;
-    var f = fmtInput(t.value, t.dataset.fmt);
-    if (f !== t.value) {
-      t.value = f;
-      var e2 = document.createEvent('Event');
-      e2.initEvent('input', true, true);
-      t.dispatchEvent(e2);
+  document.addEventListener('focusout', function (event) {
+    var target = event.target;
+    if (!target || !target.dataset || !target.dataset.fmt) {
+      return;
+    }
+
+    var formattedValue = formatInputValue(target.value, target.dataset.fmt);
+    if (formattedValue !== target.value) {
+      target.value = formattedValue;
+
+      var inputEvent = document.createEvent('Event');
+      inputEvent.initEvent('input', true, true);
+      target.dispatchEvent(inputEvent);
     }
   });
 
-  // format inputs as soon as they are (re)rendered, so stored values
-  // display as 1,234.56 / 4.25% without waiting for a blur
-  function formatAllIn(root) {
-    if (!root || !root.querySelectorAll) return;
-    var list = root.querySelectorAll('input[data-fmt]');
-    for (var i = 0; i < list.length; i++) {
-      var t = list[i];
-      if (t === document.activeElement) continue;
-      var f = fmtInput(t.value, t.dataset.fmt);
-      if (f !== t.value) t.value = f;   // display only; state keeps its value
+  function formatAllInputsIn(rootElement) {
+    if (!rootElement || !rootElement.querySelectorAll) {
+      return;
+    }
+
+    var inputs = rootElement.querySelectorAll('input[data-fmt]');
+    for (var index = 0; index < inputs.length; index++) {
+      var input = inputs[index];
+      if (input === document.activeElement) {
+        continue;
+      }
+
+      var formattedValue = formatInputValue(input.value, input.dataset.fmt);
+      if (formattedValue !== input.value) {
+        input.value = formattedValue;
+      }
     }
   }
+
   if (typeof MutationObserver !== 'undefined') {
-    new MutationObserver(function (muts) {
-      for (var i = 0; i < muts.length; i++) {
-        for (var j = 0; j < muts[i].addedNodes.length; j++) {
-          formatAllIn(muts[i].addedNodes[j]);
+    new MutationObserver(function (mutations) {
+      for (var mutationIndex = 0; mutationIndex < mutations.length; mutationIndex++) {
+        var addedNodes = mutations[mutationIndex].addedNodes;
+        for (var nodeIndex = 0; nodeIndex < addedNodes.length; nodeIndex++) {
+          formatAllInputsIn(addedNodes[nodeIndex]);
         }
       }
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
-  App.formatAllInputs = function () { formatAllIn(document); };
 
-  // Enter commits the value (same as leaving the field)
-  document.addEventListener('keydown', function (ev) {
-    if (ev.key !== 'Enter') return;
-    var t = ev.target;
-    if (t && t.tagName === 'INPUT' && t.dataset && t.dataset.fmt) {
-      ev.preventDefault();
-      t.blur();
+  CalculatorApp.formatAllInputs = function () {
+    formatAllInputsIn(document);
+  };
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter') {
+      return;
+    }
+
+    var target = event.target;
+    if (target && target.tagName === 'INPUT' && target.dataset && target.dataset.fmt) {
+      event.preventDefault();
+      target.blur();
     }
   });
 })();

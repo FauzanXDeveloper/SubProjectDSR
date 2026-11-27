@@ -1,177 +1,369 @@
-/* ============================================================
-   core/decision.js - the decision summary shown under the products.
-   Builds one normalised result for standalone products and combos
-   (PF + HF, PF + CC, HF + CC). Products not in the list are skipped.
-   ============================================================ */
+/* ---------------- decision summary ---------------- */
+
 (function () {
   'use strict';
-  var App = window.App = window.App || {};
-  var E = window.Engine;
-  var fmt = App.mod.ui.fmt, fmtPct = App.mod.ui.fmtPct, DSR_DP = App.mod.ui.DSR_DP, esc = App.mod.ui.esc, el = App.mod.ui.el, vClass = App.mod.ui.vClass, vLabel = App.mod.ui.vLabel;
-  var applicantType = App.mod.applicants.applicantType, applicantPersonalIncome = App.mod.applicants.applicantPersonalIncome, hfApplicantList = App.mod.applicants.hfApplicantList;
-  /* ============================================================
-     COMBO - compose the pure per-product functions, never fork
-     ============================================================ */
-  /**
-   * Normalised decision model for EVERY ready mode - standalone AND combo -
-   * so the on-screen banner and the PDF report render from ONE source.
-   * Returns null when intake is not complete. Two shapes:
-   *   kind:'per-applicant'  (hf-cc / pf-hf: one DSR row per applicant)
-   *   kind:'single'         (pf / hf / cc standalone and pf-cc: one DSR)
-   */
-  App.combinedDecisionData = function (mode) {
-    if (!App.computed.intakeReady) return null;
-    var c = App.computed, s = App.state;
-    var hasPF = mode.indexOf('pf') !== -1;
-    var hasHF = mode.indexOf('hf') !== -1;
-    var hasCC = mode.indexOf('cc') !== -1;
 
-    // Per-applicant instalment maps (PF+HF / HF+CC assign a facility per
-    // applicant; every other combo is the single main applicant).
-    var pfTotal = 0, pfByApplicant = {};
-    if (hasPF) {
-      if (mode === 'pf-hf') {
-        App.runSeed('pf');
-        (s.pf.apps || []).forEach(function (a) {
-          var inst = App.computePFApp(a).instalment;
-          pfByApplicant[a.applicant] = (pfByApplicant[a.applicant] || 0) + inst;
-          pfTotal += inst;
-        });
-      } else { pfTotal = App.computePF().instalment; pfByApplicant.MAIN = pfTotal; }
-    }
-    var ccTotal = 0, ccByApplicant = {};
-    if (hasCC) {
-      if (mode === 'hf-cc') {
-        App.runSeed('cc');
-        (s.cc.cards || []).forEach(function (card) {
-          var inst = App.computeCCCard(card).active.monthlyInstallment;
-          ccByApplicant[card.applicant] = (ccByApplicant[card.applicant] || 0) + inst;
-          ccTotal += inst;
-        });
-      } else { ccTotal = App.computeCC().active.monthlyInstallment; ccByApplicant.MAIN = ccTotal; }
-    }
+  var CalculatorApp = window.App = window.App || {};
+  var calculatorEngine = window.Engine;
 
-    // ---- Per-applicant combos (Home Financing split across applicants) ----
-    if (mode === 'hf-cc' || mode === 'pf-hf') {
-      var hf = App.computeHF();
-      var hfInst = hf.ctf !== 0 ? hf.ctf : hf.instalment;
-      var apps = hfApplicantList();
-      var N = apps.length || 1;
-      var share = hfInst / N;
-      var l57 = {};
-      hf.perApplicant.forEach(function (p) { l57[p.key] = p.l57; });
-      var rows = apps.map(function (ap) {
-        var main = ap.key === 'MAIN';
-        var pers = applicantPersonalIncome(ap.key);
-        var existing = main ? c.grandTotal : (l57[ap.key] || 0);
-        var pfShare = pfByApplicant[ap.key] || 0;
-        var ccShare = ccByApplicant[ap.key] || 0;
-        var commit = share + existing + pfShare + ccShare;
-        var dsr = pers.net > 0 ? commit / pers.net : 0;
-        var thr = E.hfThreshold(pers.gross, applicantType(ap.key));
-        var ok = dsr > 0 && dsr <= thr;
-        var build = [['HF', share]], prods = ['HF'];
-        if (pfShare) { build.push(['PF', pfShare]); prods.push('PF'); }
-        if (ccShare) { build.push(['CC', ccShare]); prods.push('CC'); }
-        return { key: ap.key, name: ap.name, build: build, prods: prods,
-          existing: existing, commit: commit, net: pers.net, dsr: dsr, ok: ok };
-      });
-      return { kind: 'per-applicant', mode: mode, hfInst: hfInst, N: N, rows: rows };
-    }
+  var ui = CalculatorApp.mod.ui;
+  var formatCurrency = ui.formatCurrency;
+  var formatPercent = ui.formatPercent;
+  var DSR_DECIMALS = ui.DSR_DECIMALS;
+  var escapeHtml = ui.escapeHtml;
+  var getElementById = ui.getElementById;
+  var verdictClass = ui.verdictClass;
+  var verdictLabel = ui.verdictLabel;
 
-    // ---- HF standalone (may still have joint applicants; combined Summary) ----
-    if (mode === 'hf') {
-      var hfS = App.computeHF();
-      var hfSInst = hfS.ctf !== 0 ? hfS.ctf : hfS.instalment;
-      var netS = hfS.income ? hfS.income.netIncome : c.netIncome;
-      return { kind: 'single', mode: mode, multi: false,
-        parts: [{ code: 'HF', label: 'Home Financing', amount: hfSInst, verdict: hfS.verdict }],
-        commitment: hfS.newCommitment, dsr: hfS.newDSR, ndi: netS - hfS.newCommitment,
-        verdict: hfS.verdict, prods: ['HF'] };
-    }
+  var getApplicantType = CalculatorApp.mod.applicants.applicantType;
+  var getPersonalIncome = CalculatorApp.mod.applicants.applicantPersonalIncome;
+  var getApplicantList = CalculatorApp.mod.applicants.hfApplicantList;
 
-    // ---- Single DSR: PF / CC standalone and PF+CC (main-applicant pot) ----
-    var parts = [], instalments = 0, thresholds = [], lastVerdict = null;
-    if (hasPF) {
-      var pf = App.computePF();
-      instalments += pfTotal; thresholds.push(pf.threshold);
-      parts.push({ code: 'PF', label: 'Personal Financing', amount: pfTotal, verdict: pf.verdict });
-      lastVerdict = pf.verdict;
-    }
-    if (hasCC) {
-      var cc = App.computeCC();
-      instalments += ccTotal; thresholds.push(E.ccDsrThreshold(c.grossIncome) / 100);
-      parts.push({ code: 'CC', label: 'Credit Card', amount: ccTotal, verdict: cc.verdict });
-      lastVerdict = cc.verdict;
-    }
-    var valid = thresholds.filter(function (t) { return t > 0; });
-    var governing = valid.length ? Math.min.apply(null, valid) : 0;
-    var commitment = c.grandTotal + instalments;
-    var dsr = c.netIncome > 0 ? commitment / c.netIncome : 0;
-    var ndi = c.netIncome - commitment;
-    var multi = parts.length > 1;
-    // Standalone uses the product's OWN verdict (respects CC limit eligibility);
-    // a multi-product combo uses the governing-threshold DSR verdict.
-    var verdict = multi
-      ? (governing > 0 && dsr <= governing ? E.VERDICT.OK : E.VERDICT.DSR_BURST)
-      : lastVerdict;
-    return { kind: 'single', mode: mode, multi: multi, parts: parts,
-      commitment: commitment, dsr: dsr, ndi: ndi, verdict: verdict,
-      prods: parts.map(function (p) { return p.code; }) };
-  };
-
-  /** Per-applicant banner (hf-cc / pf-hf). */
-  function perApplicantBanner(d) {
-    var rows = d.rows.map(function (r) {
-      var build = r.build.map(function (b) { return b[0] + ' ' + fmt(b[1]); });
-      if (r.existing) build.push('existing ' + fmt(r.existing));
-      var verdictTxt = (r.ok ? 'APPROVED ' : 'REJECTED ') + r.prods.join(' + ');
-      return '<div class="cb-person">' +
-        '<div class="cb-who"><div class="cb-name">' + esc(r.name) + '</div>' +
-        '<div class="cb-build">' + build.join('  +  ') + '</div></div>' +
-        '<div class="cb-metric"><span>New commitment</span><b>' + fmt(r.commit) + '</b></div>' +
-        '<div class="cb-metric"><span>Personal net</span><b>' + fmt(r.net) + '</b></div>' +
-        '<div class="cb-metric"><span>DSR</span><b class="cb-dsr">' + fmtPct(r.dsr, DSR_DP) + '</b></div>' +
-        '<div class="cb-metric"><span class="verdict ' + (r.ok ? 'ok' : 'fail') + '">' + verdictTxt + '</span></div>' +
-        '</div>';
-    }).join('');
-    return '<div class="combined-banner">' +
-      '<div class="cb-title">Combined Application - per applicant &nbsp;&middot;&nbsp; home instalment ' +
-      fmt(d.hfInst) + ' split &divide; ' + d.N + '</div>' + rows + '</div>';
+  function productPassed(verdict) {
+    return verdict == null || verdict === '' ||
+      verdict === calculatorEngine.VERDICT.OK ||
+      verdict === calculatorEngine.VERDICT.ELIGIBLE;
   }
 
-  /** Single-DSR banner (standalone summary AND pf-cc). Arranged as one row of
-      labelled metrics ending in the decision pill. */
-  function singleBanner(d) {
-    var title = (d.multi ? 'Combined Application - ' : 'Application Summary - ') + d.prods.join(' + ');
-    var partsHtml = d.parts.map(function (p) {
-      // A single-product summary carries the decision once (the pill below);
-      // only a multi-product combo labels each facility's own verdict.
-      var v = d.multi ? ' (' + (vLabel(p.verdict) || '-') + ')' : '';
-      return '<div class="cb-metric"><span>' + esc(p.label) + v + '</span>' +
-        '<b>' + fmt(p.amount) + '</b></div>';
+  CalculatorApp.combinedDecisionData = function (mode) {
+    if (!CalculatorApp.computed.intakeReady) {
+      return null;
+    }
+
+    var calculatedValues = CalculatorApp.computed;
+    var calculatorState = CalculatorApp.state;
+
+    var hasPersonalFinancing = mode.indexOf('pf') !== -1;
+    var hasCreditCard = mode.indexOf('cc') !== -1;
+
+    var personalFinancingTotal = 0;
+    var personalFinancingByApplicant = {};
+    var personalFinancingPassedByApplicant = {};
+
+    if (hasPersonalFinancing) {
+      if (mode === 'pf-hf') {
+        CalculatorApp.runSeed('pf');
+        (calculatorState.pf.apps || []).forEach(function (application) {
+          var result = CalculatorApp.computePFApp(application);
+          personalFinancingByApplicant[application.applicant] =
+            (personalFinancingByApplicant[application.applicant] || 0) + result.instalment;
+          personalFinancingTotal += result.instalment;
+
+          var passed = result.verdict === calculatorEngine.VERDICT.OK ||
+            result.verdict === calculatorEngine.VERDICT.ELIGIBLE;
+          personalFinancingPassedByApplicant[application.applicant] =
+            personalFinancingPassedByApplicant[application.applicant] !== false && passed;
+        });
+      } else {
+        personalFinancingTotal = CalculatorApp.computePF().instalment;
+        personalFinancingByApplicant.MAIN = personalFinancingTotal;
+      }
+    }
+
+    var creditCardTotal = 0;
+    var creditCardByApplicant = {};
+    var creditCardPassedByApplicant = {};
+
+    if (hasCreditCard) {
+      if (mode === 'hf-cc') {
+        CalculatorApp.runSeed('cc');
+        (calculatorState.cc.cards || []).forEach(function (card) {
+          var result = CalculatorApp.computeCCCard(card);
+          creditCardByApplicant[card.applicant] =
+            (creditCardByApplicant[card.applicant] || 0) + result.active.monthlyInstallment;
+          creditCardTotal += result.active.monthlyInstallment;
+
+          var passed = result.verdict === calculatorEngine.VERDICT.ELIGIBLE ||
+            result.verdict === calculatorEngine.VERDICT.OK;
+          creditCardPassedByApplicant[card.applicant] =
+            creditCardPassedByApplicant[card.applicant] !== false && passed;
+        });
+      } else {
+        creditCardTotal = CalculatorApp.computeCC().active.monthlyInstallment;
+        creditCardByApplicant.MAIN = creditCardTotal;
+      }
+    }
+
+    if (mode === 'hf-cc' || mode === 'pf-hf') {
+      var homeFinancing = CalculatorApp.computeHF();
+      var homeInstalment = homeFinancing.ctf !== 0 ? homeFinancing.ctf : homeFinancing.instalment;
+      var applicants = getApplicantList();
+      var applicantCount = applicants.length || 1;
+      var homeShare = homeInstalment / applicantCount;
+
+      var ownL57 = {};
+      homeFinancing.perApplicant.forEach(function (applicantResult) {
+        ownL57[applicantResult.key] = applicantResult.l57;
+      });
+
+      var applicantRows = applicants.map(function (applicant) {
+        var isMain = applicant.key === 'MAIN';
+        var personalIncome = getPersonalIncome(applicant.key);
+        var existingCommitment = isMain
+          ? calculatedValues.grandTotal
+          : (ownL57[applicant.key] || 0);
+
+        var personalFinancingShare = personalFinancingByApplicant[applicant.key] || 0;
+        var creditCardShare = creditCardByApplicant[applicant.key] || 0;
+
+        var newCommitment = homeShare + existingCommitment +
+          personalFinancingShare + creditCardShare;
+        var dsr = personalIncome.net > 0 ? newCommitment / personalIncome.net : 0;
+        var threshold = calculatorEngine.hfThreshold(
+          personalIncome.gross,
+          getApplicantType(applicant.key)
+        );
+
+        var homePassed = dsr > 0 && dsr <= threshold;
+        var personalFinancingPassed = personalFinancingPassedByApplicant[applicant.key] !== false;
+        var creditCardPassed = creditCardPassedByApplicant[applicant.key] !== false;
+        var allProductsPassed = personalFinancingPassed && creditCardPassed;
+        var combinedPassed = homePassed && allProductsPassed;
+
+        var buildParts = [['HF', homeShare]];
+        var allProductCodes = ['HF'];
+        var passingCodes = homePassed ? ['HF'] : [];
+
+        if (personalFinancingShare) {
+          buildParts.push(['PF', personalFinancingShare]);
+          allProductCodes.push('PF');
+          if (personalFinancingPassed) {
+            passingCodes.push('PF');
+          }
+        }
+
+        if (creditCardShare) {
+          buildParts.push(['CC', creditCardShare]);
+          allProductCodes.push('CC');
+          if (creditCardPassed) {
+            passingCodes.push('CC');
+          }
+        }
+
+        var labelProducts = allProductsPassed
+          ? allProductCodes
+          : (passingCodes.length ? passingCodes : allProductCodes);
+        var labelPassed = allProductsPassed
+          ? combinedPassed
+          : passingCodes.length > 0;
+
+        return {
+          key: applicant.key,
+          name: applicant.name,
+          build: buildParts,
+          prods: allProductCodes,
+          labelProds: labelProducts,
+          ok: labelPassed,
+          existing: existingCommitment,
+          commit: newCommitment,
+          net: personalIncome.net,
+          dsr: dsr
+        };
+      });
+
+      return {
+        kind: 'per-applicant',
+        mode: mode,
+        hfInst: homeInstalment,
+        N: applicantCount,
+        rows: applicantRows
+      };
+    }
+
+    if (mode === 'hf') {
+      var homeResult = CalculatorApp.computeHF();
+      var homeInstalmentAmount = homeResult.ctf !== 0 ? homeResult.ctf : homeResult.instalment;
+      var homeNet = homeResult.income ? homeResult.income.netIncome : calculatedValues.netIncome;
+
+      return {
+        kind: 'single',
+        mode: mode,
+        multi: false,
+        parts: [{
+          code: 'HF',
+          label: 'Home Financing',
+          amount: homeInstalmentAmount,
+          verdict: homeResult.verdict
+        }],
+        commitment: homeResult.newCommitment,
+        dsr: homeResult.newDSR,
+        ndi: homeNet - homeResult.newCommitment,
+        verdict: homeResult.verdict,
+        prods: ['HF'],
+        labelProds: ['HF']
+      };
+    }
+
+    var parts = [];
+    var thresholds = [];
+    var lastVerdict = null;
+
+    if (hasPersonalFinancing) {
+      var personalFinancing = CalculatorApp.computePF();
+      thresholds.push(personalFinancing.threshold);
+      parts.push({
+        code: 'PF',
+        label: 'Personal Financing',
+        amount: personalFinancingTotal,
+        verdict: personalFinancing.verdict
+      });
+      lastVerdict = personalFinancing.verdict;
+    }
+
+    if (hasCreditCard) {
+      var creditCard = CalculatorApp.computeCC();
+      thresholds.push(calculatorEngine.ccDsrThreshold(calculatedValues.grossIncome) / 100);
+      parts.push({
+        code: 'CC',
+        label: 'Credit Card',
+        amount: creditCardTotal,
+        verdict: creditCard.verdict
+      });
+      lastVerdict = creditCard.verdict;
+    }
+
+    var validThresholds = thresholds.filter(function (threshold) {
+      return threshold > 0;
+    });
+    var governingThreshold = validThresholds.length
+      ? Math.min.apply(null, validThresholds)
+      : 0;
+
+    var isCombo = parts.length > 1;
+    var allProductCodes = parts.map(function (part) { return part.code; });
+    var allProductsPassed = parts.every(function (part) {
+      return productPassed(part.verdict);
+    });
+    var passingParts = parts.filter(function (part) {
+      return productPassed(part.verdict);
+    });
+    var passingCodes = passingParts.map(function (part) {
+      return part.code;
+    });
+
+    var resultParts = (isCombo && !allProductsPassed && passingParts.length)
+      ? passingParts
+      : parts;
+    var resultInstalments = resultParts.reduce(function (sum, part) {
+      return sum + part.amount;
+    }, 0);
+    var newCommitment = calculatedValues.grandTotal + resultInstalments;
+    var dsr = calculatedValues.netIncome > 0 ? newCommitment / calculatedValues.netIncome : 0;
+    var ndi = calculatedValues.netIncome - newCommitment;
+    var combinedDsrPassed = governingThreshold > 0 && dsr <= governingThreshold;
+
+    var finalVerdict;
+    var labelProducts;
+
+    if (!isCombo) {
+      finalVerdict = lastVerdict;
+      labelProducts = allProductCodes;
+    } else if (allProductsPassed) {
+
+      finalVerdict = combinedDsrPassed
+        ? calculatorEngine.VERDICT.OK
+        : calculatorEngine.VERDICT.DSR_BURST;
+      labelProducts = allProductCodes;
+    } else if (passingCodes.length) {
+
+      finalVerdict = calculatorEngine.VERDICT.OK;
+      labelProducts = passingCodes;
+    } else {
+      finalVerdict = calculatorEngine.VERDICT.DSR_BURST;
+      labelProducts = allProductCodes;
+    }
+
+    return {
+      kind: 'single',
+      mode: mode,
+      multi: isCombo,
+      parts: resultParts,
+      commitment: newCommitment,
+      dsr: dsr,
+      ndi: ndi,
+      verdict: finalVerdict,
+      prods: resultParts.map(function (part) { return part.code; }),
+      labelProds: labelProducts
+    };
+  };
+
+  /* ---------------- banners ---------------- */
+function buildPerApplicantBanner(decision) {
+    var applicantRows = decision.rows.map(function (row) {
+      var buildText = row.build.map(function (buildPart) {
+        return buildPart[0] + ' ' + formatCurrency(buildPart[1]);
+      });
+
+      if (row.existing) {
+        buildText.push('existing ' + formatCurrency(row.existing));
+      }
+
+      var labelProducts = row.labelProds || row.prods;
+      var verdictText = (row.ok ? 'APPROVED ' : 'REJECTED ') + labelProducts.join(' + ');
+
+      return '<div class="cb-person">' +
+        '<div class="cb-who">' +
+          '<div class="cb-name">' + escapeHtml(row.name) + '</div>' +
+          '<div class="cb-build">' + buildText.join('  +  ') + '</div>' +
+        '</div>' +
+        '<div class="cb-metric"><span>New commitment</span><b>' + formatCurrency(row.commit) + '</b></div>' +
+        '<div class="cb-metric"><span>Personal net</span><b>' + formatCurrency(row.net) + '</b></div>' +
+        '<div class="cb-metric"><span>DSR</span><b class="cb-dsr">' + formatPercent(row.dsr, DSR_DECIMALS) + '</b></div>' +
+        '<div class="cb-metric"><span class="verdict ' + (row.ok ? 'ok' : 'fail') + '">' + verdictText + '</span></div>' +
+      '</div>';
     }).join('');
-    var vl = vLabel(d.verdict);
-    var verdictTxt = (vl || 'PENDING') + ' ' + d.prods.join(' + ');
-    var vcls = vClass(d.verdict) || 'warn';
+
     return '<div class="combined-banner">' +
-      '<div class="cb-title">' + esc(title) + '</div>' +
+      '<div class="cb-title">Combined Application - per applicant &nbsp;&middot;&nbsp; home instalment ' +
+      formatCurrency(decision.hfInst) + ' split &divide; ' + decision.N + '</div>' +
+      applicantRows + '</div>';
+  }
+
+  function buildSingleBanner(decision) {
+    var titlePrefix = decision.multi ? 'Combined Application - ' : 'Application Summary - ';
+    var title = titlePrefix + decision.prods.join(' + ');
+
+    var partsHtml = decision.parts.map(function (part) {
+
+      var partVerdict = decision.multi ? ' (' + (verdictLabel(part.verdict) || '-') + ')' : '';
+      return '<div class="cb-metric"><span>' + escapeHtml(part.label) + partVerdict + '</span>' +
+        '<b>' + formatCurrency(part.amount) + '</b></div>';
+    }).join('');
+
+    var labelProducts = decision.labelProds || decision.prods;
+    var decisionText = (verdictLabel(decision.verdict) || 'PENDING') + ' ' + labelProducts.join(' + ');
+    var decisionClass = verdictClass(decision.verdict) || 'warn';
+
+    return '<div class="combined-banner">' +
+      '<div class="cb-title">' + escapeHtml(title) + '</div>' +
       '<div class="cb-single">' + partsHtml +
-      '<div class="cb-metric"><span>New commitment</span><b>' + fmt(d.commitment) + '</b></div>' +
-      '<div class="cb-metric"><span>New DSR</span><b class="cb-dsr">' + fmtPct(d.dsr, DSR_DP) + '</b></div>' +
-      '<div class="cb-metric"><span>NDI</span><b>' + fmt(d.ndi) + '</b></div>' +
-      '<div class="cb-metric"><span class="verdict ' + vcls + '">' + verdictTxt + '</span></div>' +
+        '<div class="cb-metric"><span>New commitment</span><b>' + formatCurrency(decision.commitment) + '</b></div>' +
+        '<div class="cb-metric"><span>New DSR</span><b class="cb-dsr">' + formatPercent(decision.dsr, DSR_DECIMALS) + '</b></div>' +
+        '<div class="cb-metric"><span>NDI</span><b>' + formatCurrency(decision.ndi) + '</b></div>' +
+        '<div class="cb-metric"><span class="verdict ' + decisionClass + '">' + decisionText + '</span></div>' +
       '</div></div>';
   }
 
-  App.refreshCombined = function (mode) {
-    var box = el('combined-panel');
-    if (!box) return;
-    var d = App.combinedDecisionData(mode);
-    if (!d) { box.innerHTML = ''; return; }
-    box.innerHTML = d.kind === 'per-applicant' ? perApplicantBanner(d) : singleBanner(d);
+  CalculatorApp.refreshCombined = function (mode) {
+    var panel = getElementById('combined-panel');
+    if (!panel) {
+      return;
+    }
+
+    var decision = CalculatorApp.combinedDecisionData(mode);
+    if (!decision) {
+      panel.innerHTML = '';
+      return;
+    }
+
+    panel.innerHTML = decision.kind === 'per-applicant'
+      ? buildPerApplicantBanner(decision)
+      : buildSingleBanner(decision);
   };
 
-  App.mod = App.mod || {};
-  App.mod.decision = { perApplicantBanner: perApplicantBanner, singleBanner: singleBanner };
+  CalculatorApp.mod = CalculatorApp.mod || {};
+  CalculatorApp.mod.decision = {
+    perApplicantBanner: buildPerApplicantBanner,
+    singleBanner: buildSingleBanner
+  };
 })();

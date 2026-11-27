@@ -1,9 +1,5 @@
-/* ============================================================
-   dsrThresholds.js - DSR pass/fail tables + verdict strings
-   Sources: 03_Home_Financing_Manual_DSR.txt sections 4 & 6,
-            04_PF_CCRIS_DSR_Evaluation_Report.txt sections 6 & 8,
-            credit_card.txt section 5 step 6.
-   ============================================================ */
+/* ---------------- dsr thresholds ---------------- */
+
 (function () {
   'use strict';
   window.Engine = window.Engine || {};
@@ -16,13 +12,8 @@
     ELIGIBLE: 'ELIGIBLE'
   };
 
-  /* All policy numbers read from the central config at call time, so
-     admin/settings.html overrides apply without touching this logic. */
   function CFG() { return window.Engine.CONFIG; }
 
-  /** Home Financing DSR threshold (fraction), income-banded.
-      NORMAL  (List Z2:AA6): <3000 fail; >=3000 70%; >=5000 80%; >=16500 85%
-      BIZMAN  (List AC3:AD5): >=5000 80%; >=16500 85% */
   function hfThreshold(grossIncome, customerType) {
     var h = CFG().hf;
     if (customerType === 'BIZMAN') {
@@ -36,7 +27,6 @@
     return 0;
   }
 
-  /** HF verdict. dsr as fraction. */
   function hfVerdict(grossIncome, customerType, dsr) {
     var thr = hfThreshold(grossIncome, customerType);
     if (thr === 0) return { verdict: VERDICT.NOT_ELIGIBLE, threshold: 0 };
@@ -46,9 +36,6 @@
     };
   }
 
-  /** Personal Financing DSR threshold (fraction) + NDI minimum.
-      TYPE B: income <10000 -> 70%, >=10000 -> 75%, NDI >= 1500
-      TYPE A: 60% across the board, NDI >= 2000 */
   function pfThreshold(grossIncome, customerClass) {
     var p = CFG().pf;
     if (customerClass === 'TYPE B') {
@@ -58,8 +45,6 @@
     return { threshold: p.typeA.threshold, ndiMin: p.typeA.ndiMin };
   }
 
-  /** Excel H123 verdict is on DSR only - the NDI floor is returned for
-      display but does not flip the verdict (matches the master Excel). */
   function pfVerdict(grossIncome, customerClass, dsr, ndi) {
     var t = pfThreshold(grossIncome, customerClass);
     var ok = dsr <= t.threshold;
@@ -69,15 +54,12 @@
     };
   }
 
-  /** PF stress-test verdict: TYPE A also uses 70/75% in the stress block
-      (04 section 6). No NDI floor stated for the stress block. */
   function pfStressVerdict(grossIncome, dsr) {
     var st = CFG().pf.stress;
     var thr = grossIncome < st.incomeBreak ? st.low : st.high;
     return { verdict: dsr <= thr ? VERDICT.OK : VERDICT.DSR_BURST, threshold: thr };
   }
 
-  /** Unsecured new-DSR cap (List P14:Q17), fraction. */
   function unsecuredCap(grossIncome) {
     var u = CFG().unsecured;
     if (grossIncome >= u.cap3Min) return u.cap3;
@@ -86,21 +68,13 @@
     return 0;
   }
 
-  /** Max Unsecured Multiplier (MUM) by income bracket (List S/T, V/W). */
   function maxUnsecuredMultiplier(grossIncome) {
     var u = CFG().unsecured;
-    if (grossIncome > u.mumHighMin) return u.mumHigh;   // strictly above
+    if (grossIncome > u.mumHighMin) return u.mumHigh;
     if (grossIncome > u.mumMidMin) return u.mumMid;
     return u.mumLow;
   }
 
-  /** PF eligibility gate (Excel H113) - bands on GROSS INCOME, not the
-      requested amount:
-        income < 3000           -> NOT ELIGIBLE
-        income >= 5000          -> OK
-        3000 <= income < 5000   -> requested amount must be <= the
-          risk-grade limit (List!BC:BD); above it -> EXCEED LIMIT.
-      gradeMax null (matrix not exported) -> band treated as OK. */
   function pfEligibilityGate(grossIncome, amount, gradeMax) {
     var g = CFG().pf.gate;
     if (!grossIncome || grossIncome < g.minIncome) return VERDICT.NOT_ELIGIBLE;
@@ -111,11 +85,6 @@
 
   Engine.VERDICT = VERDICT;
 
-  /* Officer-facing verdict wording. Internally the engine keeps the Excel
-     master's own strings (OK / DSR BURST / NOT ELIGIBLE / EXCEED LIMIT /
-     ELIGIBLE) so the parity tests stay honest, but every screen and the PDF
-     collapse them to a single two-state decision: APPROVED or REJECTED.
-     A blank verdict (no facility entered -> DSR 0) stays blank. */
   Engine.verdictLabel = function (v) {
     if (v == null || v === '') return '';
     return (v === VERDICT.OK || v === VERDICT.ELIGIBLE) ? 'APPROVED' : 'REJECTED';
@@ -134,11 +103,8 @@
   Engine.maxUnsecuredMultiplier = maxUnsecuredMultiplier;
   Engine.pfEligibilityGate = pfEligibilityGate;
 
-  /* ---------- formatting helpers (shared) ---------- */
-  /** Bare amount, no currency prefix - for grids like CCRIS where the
-      whole table is ringgit and repeating "RM" on 8 cells per row is
-      noise. Figures stay right-aligned and tabular, so they read as one
-      column of money without being told so 40 times. */
+  /* ---------------- formatting helpers (shared) ---------------- */
+
   Engine.formatAmount = function (v, dashZero) {
     var n = parseFloat(v);
     if (!isFinite(n) || (dashZero !== false && n === 0)) return '-';
@@ -146,9 +112,7 @@
       minimumFractionDigits: 2, maximumFractionDigits: 2
     });
   };
-  /** Amount with the RM prefix - for standalone figures (summary tiles,
-      verdict banners, the printed report) where there is no column header
-      to carry the unit. */
+
   Engine.formatCurrency = function (v, dashZero) {
     var a = Engine.formatAmount(v, dashZero);
     return a === '-' ? a : 'RM ' + a;

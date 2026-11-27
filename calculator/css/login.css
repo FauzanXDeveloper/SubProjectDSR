@@ -1,4 +1,5 @@
-/* login gate (shown before the calculator) */
+/* ---------------- login gate ---------------- */
+
 [hidden] { display: none !important; }
 
 .login-gate {
@@ -8,17 +9,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.72);
+  background: #ffffff;
   padding: 16px;
 }
 
+/* ---------------- login card ---------------- */
 .login-card {
   background: #ffffff;
   color: #1b2733;
   width: min(360px, 92vw);
   padding: 28px 26px 24px;
   border-radius: 12px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 24px 60px rgba(15, 23, 42, 0.18),
+    0 6px 18px rgba(15, 23, 42, 0.10);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -50,16 +54,16 @@
   font-size: 14px;
   font-weight: 400;
   padding: 9px 10px;
-  border: 1px solid #c9d2dc;
+  border: 1px solid #0F4C81;
   border-radius: 7px;
   color: #1b2733;
   background: #fff;
 }
 
 .login-card input:focus {
-  outline: 2px solid #0f766e;
+  outline: 2px solid #0F4C81;
   outline-offset: 0;
-  border-color: #0f766e;
+  border-color: #0F4C81;
 }
 
 .login-msg {
@@ -76,7 +80,7 @@
   border: 0;
   border-radius: 7px;
   color: #ffffff;
-  background: #0f766e;
+  background: #0F4C81;
   cursor: pointer;
 }
 

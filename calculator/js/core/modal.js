@@ -1,35 +1,27 @@
-/* ============================================================
-   modal.js - one centered, on-brand popup for every message.
-   Replaces the browser's window.alert / window.confirm (which
-   render top-left, unstyled, and cannot be branded).
+/* ---------------- popups ---------------- */
 
-   Promise-based so a confirm reads naturally:
-     App.modal.confirm('Delete this?').then(function (ok) { ... });
-     App.modal.alert('Saved.', { type: 'success' });
-     App.modal.open({ type, title, message, buttons: [...] });
-
-   type: 'info' | 'success' | 'warn' | 'error' (sets icon + accent).
-   `message` is treated as PLAIN TEXT (newlines preserved) so
-   customer names lifted from a PDF can never inject markup.
-   ============================================================ */
 (function () {
   'use strict';
-  var App = window.App = window.App || {};
 
-  var ICONS = {
-    info:    'M12 8h.01M11 12h1v4h1',
+  var CalculatorApp = window.App = window.App || {};
+
+  var ICON_PATHS = {
+    info: 'M12 8h.01M11 12h1v4h1',
     success: 'M8 12.5l2.5 2.5 5-5.5',
-    warn:    'M12 9v4M12 16.5h.01',
-    error:   'M9.5 9.5l5 5M14.5 9.5l-5 5'
+    warn: 'M12 9v4M12 16.5h.01',
+    error: 'M9.5 9.5l5 5M14.5 9.5l-5 5'
   };
 
-  var root = null, current = null;
+  var modalRoot = null;
+  var activeModal = null;
+  var lastFocusedElement = null;
 
-  function build() {
-    root = document.createElement('div');
-    root.className = 'modal-root';
-    root.setAttribute('aria-hidden', 'true');
-    root.innerHTML =
+  function buildModalRoot() {
+    modalRoot = document.createElement('div');
+    modalRoot.className = 'modal-root';
+    modalRoot.setAttribute('aria-hidden', 'true');
+
+    modalRoot.innerHTML =
       '<div class="modal-backdrop"></div>' +
       '<div class="modal-card" role="alertdialog" aria-modal="true" tabindex="-1">' +
         '<div class="modal-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
@@ -39,116 +31,179 @@
         '<p class="modal-msg" id="modal-msg"></p>' +
         '<div class="modal-actions"></div>' +
       '</div>';
-    document.body.appendChild(root);
-    // dismiss by backdrop click or Escape -> resolves the cancel value
-    root.querySelector('.modal-backdrop').addEventListener('click', function () {
-      if (current && current.dismissable) close(current.cancelValue);
+
+    document.body.appendChild(modalRoot);
+
+    modalRoot.querySelector('.modal-backdrop').addEventListener('click', function () {
+      if (activeModal && activeModal.dismissable) {
+        closeModal(activeModal.cancelValue);
+      }
     });
-    document.addEventListener('keydown', function (ev) {
-      if (!current) return;
-      if (ev.key === 'Escape' && current.dismissable) { ev.preventDefault(); close(current.cancelValue); }
-      else if (ev.key === 'Enter') {
-        var def = root.querySelector('.modal-actions .btn.is-default');
-        if (def) { ev.preventDefault(); def.click(); }
+
+    document.addEventListener('keydown', function (event) {
+      if (!activeModal) {
+        return;
+      }
+
+      if (event.key === 'Escape' && activeModal.dismissable) {
+        event.preventDefault();
+        closeModal(activeModal.cancelValue);
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        var defaultButton = modalRoot.querySelector('.modal-actions .btn.is-default');
+        if (defaultButton) {
+          event.preventDefault();
+          defaultButton.click();
+        }
       }
     });
   }
 
-  function close(value) {
-    if (!current) return;
-    var resolve = current.resolve;
-    current = null;
-    root.classList.remove('open');
-    root.setAttribute('aria-hidden', 'true');
-    // let the fade-out play before hiding, and restore focus
-    var last = root._lastFocus;
-    setTimeout(function () {
-      if (!current) root.style.display = 'none';
-      if (last && last.focus) { try { last.focus(); } catch (e) {} }
-    }, 160);
-    resolve(value);
-  }
-
-  /** Open the popup. buttons: [{ label, value, variant, default }].
-      Returns a Promise resolving to the chosen button's value (or the
-      cancel value on backdrop/Escape). */
-  function open(opts) {
-    opts = opts || {};
-    if (!root) build();
-    // if one is already open, resolve it as cancelled first
-    if (current) { var c = current; current = null; c.resolve(c.cancelValue); }
-
-    var type = ICONS[opts.type] ? opts.type : 'info';
-    var buttons = opts.buttons && opts.buttons.length ? opts.buttons
-      : [{ label: 'OK', value: true, variant: 'primary', default: true }];
-    var cancelBtn = null;
-    for (var i = 0; i < buttons.length; i++) {
-      if (buttons[i].cancel) { cancelBtn = buttons[i]; break; }
+  function closeModal(resultValue) {
+    if (!activeModal) {
+      return;
     }
 
-    var card = root.querySelector('.modal-card');
-    card.className = 'modal-card type-' + type;
-    root.querySelector('.modal-glyph').setAttribute('d', ICONS[type]);
-    root.querySelector('.modal-title').textContent = opts.title || defaultTitle(type);
-    var msgEl = root.querySelector('.modal-msg');
-    msgEl.textContent = opts.message || '';         // plain text; CSS keeps \n
-    msgEl.style.display = opts.message ? '' : 'none';
+    var resolvePromise = activeModal.resolve;
+    activeModal = null;
 
-    var actions = root.querySelector('.modal-actions');
-    actions.innerHTML = '';
-    var promise = new Promise(function (resolve) {
-      current = {
+    modalRoot.classList.remove('open');
+    modalRoot.setAttribute('aria-hidden', 'true');
+
+    setTimeout(function () {
+      if (!activeModal) {
+        modalRoot.style.display = 'none';
+      }
+      if (lastFocusedElement && lastFocusedElement.focus) {
+        try { lastFocusedElement.focus(); } catch (error) {  }
+      }
+    }, 160);
+
+    resolvePromise(resultValue);
+  }
+
+  function defaultTitleForType(type) {
+    if (type === 'success') return 'Done';
+    if (type === 'warn') return 'Please check';
+    if (type === 'error') return 'There is a problem';
+    return 'Notice';
+  }
+
+  function openModal(options) {
+    options = options || {};
+
+    if (!modalRoot) {
+      buildModalRoot();
+    }
+
+    if (activeModal) {
+      var previousModal = activeModal;
+      activeModal = null;
+      previousModal.resolve(previousModal.cancelValue);
+    }
+
+    var modalType = ICON_PATHS[options.type] ? options.type : 'info';
+
+    var buttons = options.buttons && options.buttons.length
+      ? options.buttons
+      : [{ label: 'OK', value: true, variant: 'primary', default: true }];
+
+    var cancelButton = null;
+    for (var index = 0; index < buttons.length; index++) {
+      if (buttons[index].cancel) {
+        cancelButton = buttons[index];
+        break;
+      }
+    }
+
+    var card = modalRoot.querySelector('.modal-card');
+    card.className = 'modal-card type-' + modalType;
+    modalRoot.querySelector('.modal-glyph').setAttribute('d', ICON_PATHS[modalType]);
+    modalRoot.querySelector('.modal-title').textContent = options.title || defaultTitleForType(modalType);
+
+    var messageElement = modalRoot.querySelector('.modal-msg');
+    messageElement.textContent = options.message || '';
+    messageElement.style.display = options.message ? '' : 'none';
+
+    var actionsArea = modalRoot.querySelector('.modal-actions');
+    actionsArea.innerHTML = '';
+
+    var resultPromise = new Promise(function (resolve) {
+      activeModal = {
         resolve: resolve,
-        dismissable: opts.dismissable !== false,
-        cancelValue: cancelBtn ? cancelBtn.value : (opts.cancelValue !== undefined ? opts.cancelValue : false)
+        dismissable: options.dismissable !== false,
+        cancelValue: cancelButton
+          ? cancelButton.value
+          : (options.cancelValue !== undefined ? options.cancelValue : false)
       };
-      buttons.forEach(function (b) {
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn' + (b.variant === 'secondary' ? ' secondary' :
-          b.variant === 'danger' ? ' danger' : '') + (b.default ? ' is-default' : '');
-        btn.textContent = b.label;
-        btn.addEventListener('click', function () { close(b.value); });
-        actions.appendChild(btn);
+
+      buttons.forEach(function (buttonOptions) {
+        var buttonElement = document.createElement('button');
+        buttonElement.type = 'button';
+        buttonElement.className = 'btn' +
+          (buttonOptions.variant === 'secondary' ? ' secondary' :
+            buttonOptions.variant === 'danger' ? ' danger' : '') +
+          (buttonOptions.default ? ' is-default' : '');
+        buttonElement.textContent = buttonOptions.label;
+        buttonElement.addEventListener('click', function () {
+          closeModal(buttonOptions.value);
+        });
+        actionsArea.appendChild(buttonElement);
       });
     });
 
-    root._lastFocus = document.activeElement;
-    root.style.display = '';
-    root.setAttribute('aria-hidden', 'false');
-    // next frame so the CSS transition runs from the hidden state
+    lastFocusedElement = document.activeElement;
+    modalRoot.style.display = '';
+    modalRoot.setAttribute('aria-hidden', 'false');
+
     requestAnimationFrame(function () {
-      root.classList.add('open');
-      var def = actions.querySelector('.btn.is-default') || actions.querySelector('.btn');
-      if (def && def.focus) { try { def.focus(); } catch (e) {} }
+      modalRoot.classList.add('open');
+      var focusTarget = actionsArea.querySelector('.btn.is-default') ||
+        actionsArea.querySelector('.btn');
+      if (focusTarget && focusTarget.focus) {
+        try { focusTarget.focus(); } catch (error) {  }
+      }
     });
-    return promise;
+
+    return resultPromise;
   }
 
-  function defaultTitle(type) {
-    return type === 'success' ? 'Done' : type === 'warn' ? 'Please check' :
-           type === 'error' ? 'There is a problem' : 'Notice';
-  }
-
-  function alert(message, opts) {
-    opts = opts || {};
-    return open({
-      type: opts.type || 'info', title: opts.title, message: message,
-      buttons: [{ label: opts.okLabel || 'OK', value: true, variant: 'primary', default: true }]
+  function showAlert(message, options) {
+    options = options || {};
+    return openModal({
+      type: options.type || 'info',
+      title: options.title,
+      message: message,
+      buttons: [{ label: options.okLabel || 'OK', value: true, variant: 'primary', default: true }]
     });
   }
 
-  function confirm(message, opts) {
-    opts = opts || {};
-    return open({
-      type: opts.type || 'warn', title: opts.title, message: message,
+  function showConfirm(message, options) {
+    options = options || {};
+    return openModal({
+      type: options.type || 'warn',
+      title: options.title,
+      message: message,
       buttons: [
-        { label: opts.cancelLabel || 'Cancel', value: false, variant: 'secondary', cancel: true },
-        { label: opts.okLabel || 'Confirm', value: true,
-          variant: opts.danger ? 'danger' : 'primary', default: true }
+        { label: options.cancelLabel || 'Cancel', value: false, variant: 'secondary', cancel: true },
+        {
+          label: options.okLabel || 'Confirm',
+          value: true,
+          variant: options.danger ? 'danger' : 'primary',
+          default: true
+        }
       ]
     });
   }
 
-  App.modal = { open: open, alert: alert, confirm: confirm, close: function () { close(current && current.cancelValue); } };
+  CalculatorApp.modal = {
+    open: openModal,
+    alert: showAlert,
+    confirm: showConfirm,
+    close: function () {
+      closeModal(activeModal && activeModal.cancelValue);
+    }
+  };
 })();

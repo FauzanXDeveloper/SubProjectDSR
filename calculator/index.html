@@ -5,15 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ARBM Financing &amp; DSR Calculator</title>
 <link rel="icon" type="image/png" href="public/favicon.png">
-<link rel="stylesheet" href="css/styles.css">
-<link rel="stylesheet" href="css/app.css">
-<link rel="stylesheet" href="css/theme-dark.css">
-<link rel="stylesheet" href="css/login.css">
-<script src="js/core/theme.js"></script>
+<link rel="stylesheet" href="css/styles.css?v=20261025z">
+<link rel="stylesheet" href="css/theme-dark.css?v=20261025z">
+<link rel="stylesheet" href="css/login.css?v=20261025z">
+<script src="js/core/theme.js?v=20261025z"></script>
 </head>
-<body>
+<body class="auth-locked">
 
-<!-- ================= LOGIN (users are listed in data/users.js) ================= -->
+<!-- ---------------- login ---------------- -->
 <div id="login-gate" class="login-gate">
   <form id="login-form" class="login-card" autocomplete="off">
     <img class="login-logo" src="public/alrajhi_logo.png" alt="Al Rajhi Bank Malaysia">
@@ -29,9 +28,10 @@
   </form>
 </div>
 
+<!-- ---------------- app shell ---------------- -->
 <div class="layout">
 
-  <!-- ================= SIDEBAR ================= -->
+  <!-- ---------------- sidebar ---------------- -->
   <nav class="sidebar no-print" id="sidebar">
     <div class="brand">
       <span class="brand-logo">
@@ -44,7 +44,7 @@
     </div>
 
     <div class="sidebar-scroll">
-      <!-- filled by js/core/app.js from the product list -->
+
       <div id="sidebar-nav-section"></div>
     </div>
 
@@ -83,17 +83,8 @@
     </div>
   </nav>
 
-  <!-- ================= MAIN ================= -->
+  <!-- ---------------- main ---------------- -->
   <main class="main">
-    <!-- shown only on Print / Export PDF -->
-    <div class="print-header">
-      <img src="public/alrajhi_logo.png" alt="Al Rajhi Bank Malaysia">
-      <div>
-        <div class="ph-title">Financing &amp; DSR Evaluation Report</div>
-        <div class="ph-sub" id="print-meta"></div>
-      </div>
-    </div>
-
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:10px;">
         <button class="hamburger no-print" id="btn-menu" type="button" aria-label="Menu">
@@ -104,18 +95,14 @@
       <div class="date" id="today-date"></div>
     </div>
 
-    <!-- Shared intake: required first for every product -->
     <div id="intake-customer"></div>
     <div id="intake-ccris"></div>
     <div id="intake-income"></div>
 
-    <!-- Gate message shown until minimum intake is complete -->
     <div id="intake-gate"></div>
 
-    <!-- One panel per product is added here by js/core/app.js -->
     <div id="product-panels"></div>
 
-    <!-- Combined decision summary (shown for standalone and combo views) -->
     <div id="combined-panel"></div>
 
     <footer class="app-foot no-print">
@@ -126,46 +113,43 @@
   </main>
 </div>
 
-<!-- Printed evaluation report - hidden on screen, built on each print by js/core/report.js -->
+<!-- ---------------- printed report ---------------- -->
 <div id="print-report" aria-hidden="true"></div>
 
-<!-- ================= SCRIPTS (order matters) ================= -->
-<script src="vendor/pdf.min.js"></script>
+<!-- ---------------- scripts ---------------- -->
+<script src="vendor/pdf.min.js?v=20261025z"></script>
 
-<!-- engine: pure calculation functions, copied unchanged. config.js loads first. -->
-<script src="js/engine/config.js"></script>
-<script src="js/engine/pmt.js"></script>
-<script src="js/engine/age.js"></script>
-<script src="js/engine/facilityRates.js"></script>
-<script src="js/engine/ccrisLine.js"></script>
-<script src="js/engine/income.js"></script>
-<script src="js/engine/creditLimit.js"></script>
-<script src="js/engine/dsrThresholds.js"></script>
-<script src="js/engine/hfPricing.js"></script>
-<script src="js/engine/hfSummary.js"></script>
-<script src="js/engine/pdfExtractor.js"></script>
-<script src="data/ndiPricing.js"></script>
-<script src="data/users.js"></script>
+<script src="js/engine/config.js?v=20261025z"></script>
+<script src="js/engine/pmt.js?v=20261025z"></script>
+<script src="js/engine/age.js?v=20261025z"></script>
+<script src="js/engine/facilityRates.js?v=20261025z"></script>
+<script src="js/engine/ccrisLine.js?v=20261025z"></script>
+<script src="js/engine/income.js?v=20261025z"></script>
+<script src="js/engine/creditLimit.js?v=20261025z"></script>
+<script src="js/engine/dsrThresholds.js?v=20261025z"></script>
+<script src="js/engine/hfPricing.js?v=20261025z"></script>
+<script src="js/engine/hfSummary.js?v=20261025z"></script>
+<script src="js/engine/pdfExtractor.js?v=20261025z"></script>
+<script src="data/ndiPricing.js?v=20261025z"></script>
+<script src="data/users.js?v=20261102a"></script>
 
-<!-- shared core -->
-<script src="js/core/ui.js"></script>
-<script src="js/core/state.js"></script>
-<script src="js/core/modal.js"></script>
-<script src="js/core/format.js"></script>
-<script src="js/core/applicants.js"></script>
-<script src="js/core/intake.js"></script>
+<script src="js/core/ui.js?v=20261025z"></script>
+<script src="js/core/state.js?v=20261025z"></script>
+<script src="js/core/modal.js?v=20261025z"></script>
+<script src="js/core/format.js?v=20261025z"></script>
+<script src="js/core/applicants.js?v=20261025z"></script>
+<script src="js/core/intake.js?v=20261025z"></script>
 
-<!-- products: the list lives in js/products.js (one line per product folder) -->
-<script src="js/products.js"></script>
-<script>
-  DSR_PRODUCT_FILES.forEach(function (f) {
-    document.write('<script src="' + f + '"><\/script>');
+<script src="js/products.js?v=20261025z"></script>
+<script>  DSR_PRODUCT_FILES.forEach(function (f) {
+    document.write('<script src="' + f + '?v=20261025z"><\/script>');
   });
 </script>
 
-<script src="js/core/decision.js"></script>
-<script src="js/core/report.js"></script>
-<script src="js/core/auth.js"></script>
-<script src="js/core/app.js"></script>
+<script src="js/core/decision.js?v=20261025z"></script>
+<script src="js/core/report.js?v=20261025z"></script>
+<script src="js/core/passwordHash.js?v=20261102a"></script>
+<script src="js/core/auth.js?v=20261102a"></script>
+<script src="js/core/app.js?v=20261025z"></script>
 </body>
 </html>

@@ -1,19 +1,11 @@
-/* ============================================================
-   pdfExtractor.js - client-side PDF parsing (vendored pdf.js)
-   Source: credit_card.txt section 6 (pdfExtractor.ts port)
-   A) extractFromExperian(file)     - Experian CrediTrack CCRIS
-   B) extractFromEPFStatement(file) - EPF/KWSP annual statement
-   Best-effort positional parsing; every extracted row remains
-   editable in the CCRIS/Income tables.
-   ============================================================ */
+/* ---------------- pdf extraction ---------------- */
+
 (function () {
   'use strict';
   window.Engine = window.Engine || {};
 
   function pdfAvailable() { return typeof window.pdfjsLib !== 'undefined'; }
 
-  /** Load a PDF file and return logical text rows:
-      [{ page, y, items: [{str,x}], text }] in reading order. */
   async function getTextRows(file) {
     if (!pdfAvailable()) {
       throw new Error('PDF library not found. Place pdf.min.js and pdf.worker.min.js in the /vendor folder.');
@@ -37,7 +29,7 @@
         if (!row) { row = { page: p, y: y, items: [] }; pageRows.push(row); }
         row.items.push({ str: str, x: x });
       });
-      pageRows.sort(function (a, b) { return b.y - a.y; }); // top first
+      pageRows.sort(function (a, b) { return b.y - a.y; });
       pageRows.forEach(function (r) {
         r.items.sort(function (a, b) { return a.x - b.x; });
         r.text = r.items.map(function (it) { return it.str; }).join(' ');
@@ -47,11 +39,6 @@
     return rows;
   }
 
-  /* CrediTrack ships in two text flavours. One emits clean runs
-     ("HSLNFNCE", "OWN", "OUTSTANDING CREDIT"); the other sprays stray
-     spaces inside the words ("NHE DFNCE", "OW N", "OUTS TANDING CRE DIT").
-     Collapsing whitespace makes the two compare identically, so codes are
-     matched on the squashed form and rows on space-stripped tokens. */
   function squash(s) { return String(s == null ? '' : s).toUpperCase().replace(/\s+/g, ''); }
   function normTok(s) { return String(s == null ? '' : s).replace(/\s+/g, ''); }
 
@@ -68,9 +55,7 @@
     });
     return out;
   }
-  /* Strict money: requires ".dd" decimals or thousands commas, so the
-     conduct-of-account digits (0 0 0 ...), record numbers and instalment
-     tenors are never mistaken for RM amounts. Dates fail the test too. */
+
   function strictMoney(tok) {
     var t = String(tok).replace(/\s+/g, '');
     if (!/^-?(\d{1,3}(,\d{3})+(\.\d{1,2})?|\d+\.\d{1,2})$/.test(t)) return null;
@@ -92,23 +77,19 @@
     'FACILITY', 'CCRIS', 'EXPERIAN', 'REPORT', 'SUBJECT', 'MONTH', 'ARREARS',
     'OWN', 'JOINT', 'GUARANTOR', 'DIRECTOR', 'CLEAN', 'PROPERTIES', 'VEHICLES',
     'SHARES', 'OTHERS', 'MOTOR', 'UNIT', 'TRUST',
-    // collateral labels that survive space-stripping as one word and would
-    // otherwise read as a facility code ("MOTOR V" -> MOTORV)
+
     'MOTORV', 'UNITTRUST', 'FINASSTS'
   ];
   function looksLikeFacility(tok) {
     if (!/^[A-Z]{4,15}$/.test(tok)) return false;
     return NON_FACILITY.indexOf(tok) === -1;
   }
-  /** sq: the row's squashed text. Leftmost match wins, so the Capacity
-      column is read before the Lender Type column that follows it. */
+
   function findCapacity(sq) {
     var m = sq.match(/OWN|JOINT|GUARANTOR|DIRECTOR/);
     return m ? m[0] : '';
   }
-  /** Collateral type, normalised to the exact Experian names used by the
-      stress-factor table (List!A28:B32). A motor vehicle line is
-      "MOTOR V (JPJ)" - not "VEHICLES". sq: the row's squashed text. */
+
   function findCollateral(sq) {
     if (/MOTORV/.test(sq)) return 'MOTOR V (JPJ)';
     if (/UNITTRUST/.test(sq)) return 'UNIT TRUST';
@@ -120,9 +101,6 @@
     return '';
   }
 
-  /** A PDF with no embedded text is a scan, a photo, or an image run through
-      "Print to PDF" - pdf.js can render it but there is nothing to read, so
-      every extractor would silently return zeros. Say so instead. */
   function assertHasText(rows, what) {
     if (rows && rows.length) return;
     throw new Error('this PDF has no text in it - it looks like a scan or an ' +
@@ -130,15 +108,104 @@
       'not OCR yet). Save the ' + what + ' as a normal text PDF and try again');
   }
 
-  /** A) Experian CrediTrack extractor. Returns
-      { iScore, name, icNumber, reportDate, records[], nlciRecords[], debug[] } */
   async function extractFromExperian(file) {
     var rows = await getTextRows(file);
-    assertHasText(rows, 'CrediTrack report');
+    assertHasText(rows, 'credit report');
+
+    if (looksLikeBankCCRIS(rows)) return parseBankCCRISRows(rows);
     return parseExperianRows(rows);
   }
 
-  /** Pure row-parsing core (unit-testable without a PDF). */
+  function looksLikeBankCCRIS(rows) {
+    var t = rows.map(function (r) { return r.text || ''; }).join('\n');
+    return /Report request made for/i.test(t) && /Outstanding Credit/i.test(t);
+  }
+
+  function parseBankCCRISRows(rows) {
+    var result = {
+      iScore: null, name: '', icNumber: '', reportDate: '',
+      records: [], nlciRecords: [], debug: []
+    };
+    var parent = null;
+    var inApplications = false;
+
+    function itemNear(row, x, tol) {
+      var best = null, bestD = 1e9;
+      (row.items || []).forEach(function (it) {
+        var d = Math.abs(it.x - x);
+        if (d <= (tol || 6) && d < bestD) { best = it; bestD = d; }
+      });
+      return best ? best.str : '';
+    }
+    function itemsNear(row, x, tol) {
+      return (row.items || []).filter(function (it) {
+        return Math.abs(it.x - x) <= (tol || 8);
+      }).map(function (it) { return it.str; });
+    }
+    function money(s) {
+      var v = parseMoney(String(s == null ? '' : s).replace(/\s/g, ''));
+      return v == null ? null : v;
+    }
+
+    rows.forEach(function (row) {
+      var text = row.text || '';
+
+      if (!result.name && /Applicant/i.test(text)) {
+        var ic = text.match(/\b\d{12}\b/);
+        var name = itemNear(row, 35, 8);
+        if (ic && name && /[A-Za-z]/.test(name) && !/^Name$/i.test(name)) {
+          result.name = name;
+          result.icNumber = ic[0];
+        }
+      }
+      var md = text.match(/Report Date:\s*(\d{2}\/\d{2}\/\d{4})/i);
+      if (md) result.reportDate = md[1];
+
+      if (/Application for Credit/i.test(text)) { inApplications = true; return; }
+      if (inApplications) return;
+
+      var noStr = itemNear(row, 35, 4);
+      var sts = itemNear(row, 72, 4);
+
+      if (/^\d+$/.test(noStr) && !sts) {
+        var colType = String(itemNear(row, 397, 6) || '').toUpperCase().trim();
+        parent = {
+          no: parseInt(noStr, 10),
+          date: itemsNear(row, 50, 8).join('').replace(/\s/g, ''),
+          capacity: itemNear(row, 88, 6).toUpperCase(),
+          limit: money(itemNear(row, 286, 6)) || 0,
+
+          collateral: colType === '00' ? 'CLEAN' : colType,
+          limitUsed: false
+        };
+        return;
+      }
+
+      var facility = String(itemNear(row, 168, 10) || '').toUpperCase().trim();
+      if (sts && facility && parent) {
+
+        var subCol = String(itemNear(row, 397, 6) || '').toUpperCase().trim();
+        if (!parent.collateral && subCol) {
+          parent.collateral = subCol === '00' ? 'CLEAN' : subCol;
+        }
+        var out = money(itemNear(row, 207, 8)) || 0;
+        var inst = money(itemNear(row, 286, 8)) || 0;
+        var limit = parent.limitUsed ? 0 : parent.limit;
+        parent.limitUsed = true;
+        result.records.push({
+          no: parent.no, date: parent.date, capacity: parent.capacity,
+          collateral: parent.collateral, facility: facility,
+          outstanding: out, limit: limit, legalStatus: '',
+          commitmentPerCCRIS: inst, override: '', floating: 'NO',
+          sourceSection: 'CCRIS'
+        });
+        result.debug.push('ccris ' + facility + ' out=' + out + ' lim=' + limit +
+          ' inst=' + inst + ' (item ' + parent.no + ')');
+      }
+    });
+    return result;
+  }
+
   function parseExperianRows(rows) {
     var debug = [];
     var result = {
@@ -174,23 +241,9 @@
       }
     });
 
-    /* ---- CCRIS + NLCI table sections ----
-       CCRIS layout (banking accounts): each ITEM has a PARENT row
-       [No | Date | Capacity | Lender | ... | LIMIT] and one or more facility
-       SUB-rows [O | FACILITY | OUTSTANDING | date-updated | INST.AMT | ...].
-       "Limit / Inst.Amt" is ONE shared column: the parent row shows the
-       account LIMIT, sub-rows show the facility INSTALMENT.
-       EVERY sub-row becomes its own record - lines are never summed, even
-       when one item repeats a facility (e.g. 3 credit-card lines on the same
-       date), so the officer sees exactly what the report lists. The item's
-       single shared limit stays on the FIRST sub-row only (subCount === 0);
-       repeating it would make TYPE A charge 5% of the same limit once per
-       line.
-       NLCI layout is single-line rows:
-       [No | Date | Cap | Sts | Lender | Facility | LIMIT | INST | tenor |
-        date | OUTSTANDING | ...]. */
-    var section = null;    // 'CCRIS' | 'NLCI' | null
-    var inDetail = false;  // inside "DETAILED CREDIT REPORT (BANKING ACCOUNTS)"
+    /* ---------------- CCRIS + NLCI table sections ---------------- */
+    var section = null;
+    var inDetail = false;
     var currentParent = null;
 
     function pushCCRISRecord(rec) {
@@ -202,19 +255,18 @@
 
     rows.forEach(function (row) {
       var sq = squash(row.text);
-      // The summary pages (i-SCORE, addresses, "Special Attention account 0")
-      // must never arm the row parser: only the detailed tables count.
+
       if (/DETAILEDCREDITREPORT/.test(sq)) { inDetail = true; section = null; return; }
       if (/NLCI|NON-?BANKLENDER/.test(sq)) { inDetail = true; section = 'NLCI'; currentParent = null; return; }
       if (/REMARKLEGEND/.test(sq) || /^SECTION\d/.test(sq)) { inDetail = false; section = null; return; }
       if (/WRITTEN-?OFF/.test(sq)) { section = null; return; }
       if (/CREDITAPPLICATION/.test(sq)) { section = null; return; }
       if (/OUTSTANDINGCREDIT|SPECIALATTENTION/.test(sq)) {
-        if (inDetail && section !== 'NLCI') section = 'CCRIS'; // NLCI has its own band
+        if (inDetail && section !== 'NLCI') section = 'CCRIS';
         return;
       }
       if (!inDetail || !section) return;
-      if (/TOTAL/.test(sq)) return; // totals / footer rows
+      if (/TOTAL/.test(sq)) return;
 
       var toks = row.items.map(function (it) { return normTok(it.str); });
       var dateMatch = toks.join(' ').match(/\b(\d{2}\/\d{2}\/\d{4})\b/);
@@ -223,7 +275,7 @@
 
       if (section === 'NLCI') {
         if (!isNumbered || !nums.length) return;
-        // facility = uppercase token immediately left of the first RM amount
+
         var fac = '';
         for (var q = 0; q < row.items.length; q++) {
           var it = row.items[q];
@@ -231,7 +283,7 @@
           var tok = normTok(it.str);
           if (/^[A-Z]{2,15}$/.test(tok) &&
               ['OWN', 'JOINT', 'GUARANTOR', 'DIRECTOR', 'O', 'A', 'MTH', 'CLEAN'].indexOf(tok) === -1) {
-            fac = tok; // keep the last one seen before the amounts
+            fac = tok;
           }
         }
         var nl = { limit: 0, inst: 0, out: 0 };
@@ -256,15 +308,13 @@
         return;
       }
 
-      // ---- CCRIS section ----
       var facility = null;
       for (var t = 0; t < toks.length; t++) {
         if (looksLikeFacility(toks[t])) { facility = toks[t]; break; }
       }
 
       if (isNumbered && !facility) {
-        // pure parent row: the RM amount in the Limit/Inst.Amt column is the
-        // shared account LIMIT for the sub-facility rows that follow
+
         currentParent = {
           no: parseInt(toks[0], 10),
           date: dateMatch[1],
@@ -276,11 +326,11 @@
         return;
       }
       if (!facility) return;
-      if (!nums.length) return; // page footer / disclaimer noise between table pages
+      if (!nums.length) return;
 
       var outstanding = 0, limit = 0, instalment = 0;
       if (isNumbered) {
-        // parent + facility collapsed onto one line
+
         currentParent = {
           no: parseInt(toks[0], 10), date: dateMatch[1],
           capacity: findCapacity(sq) || 'OWN',
@@ -290,7 +340,7 @@
         else if (nums.length === 2) { outstanding = nums[0].v; instalment = nums[1].v; }
         else if (nums.length === 1) { outstanding = nums[0].v; }
       } else {
-        // facility sub-row: [outstanding, instalment]; limit lives on parent
+
         if (nums.length >= 2) { outstanding = nums[0].v; instalment = nums[1].v; }
         else if (nums.length === 1) { outstanding = nums[0].v; }
         if (currentParent && currentParent.subCount === 0) limit = currentParent.limit;
@@ -317,23 +367,17 @@
     return result;
   }
 
-  /** B) EPF/KWSP statement extractor.
-      Returns { months: [{label, employer, employee, total}], debug } */
   var MALAY_MONTHS = {
     JAN: 0, FEB: 1, MAC: 2, MAR: 2, APR: 3, MEI: 4, MAY: 4, JUN: 5,
     JUL: 6, OGS: 7, OGO: 7, AUG: 7, SEP: 8, OKT: 9, OCT: 9, NOV: 10,
     DIS: 11, DEC: 11
   };
-  /* Boilerplate lines on a myEPF statement that are uppercase alpha but are
-     never the member name (banner, section titles, footer). */
+
   var EPF_NOT_NAME = /^(SULIT|PENYATA|RINGKASAN|CARUMAN|PENGELUARAN|JUMLAH|PELARASAN|PERHATIAN|NOTA|BULAN|TRANSAKSI|JENIS|BAKI|CETAKAN|MENARA)\b/i;
 
-  /** Pure row-parsing core (unit-testable without a PDF). */
   function isEPFStatementRows(rows) {
     var text = (rows || []).map(function (r) { return r.text || ''; }).join(' ').toUpperCase();
-    // Do not depend only on the uploaded filename. myEPF exports commonly
-    // identify themselves in the body as "PENYATA AHLI KWSP" and list
-    // "CARUMAN SEMASA" / employee contributions.
+
     return /\b(KWSP|EPF)\b/.test(text) &&
       /\b(CARUMAN|CONTRIBUTION|PENYATA\s+AHLI|MEMBER\s+STATEMENT)\b/.test(text);
   }
@@ -342,10 +386,6 @@
     var debug = [];
     var found = [];
 
-    // Member identity (used to cross-check against the Experian report).
-    // IC: after "Kad Pengenalan" / "No. Pengenalan", else a bare 12-digit /
-    //     dddddd-dd-dddd token.  Name: first all-caps alpha line, preferring
-    //     one carrying BIN / BINTI / A/L / A/P.
     var epfName = '', epfIC = '';
     rows.forEach(function (row) {
       var text = row.text || '';
@@ -358,20 +398,14 @@
         }
       }
     });
-    // name pass: prefer a line with a Malay/Indian name marker, else first
-    // pure-alpha uppercase line before the KWSP/PENGENALAN header.
-    // Statement furniture must never win the fallback: every myEPF statement
-    // is headed by the banner "SULIT DAN PERSENDIRIAN", which is uppercase
-    // alpha and would otherwise be taken as the member name whenever that
-    // name carries no BIN/BINTI/A-L marker (e.g. "TAN AH KOW") - blocking a
-    // legitimate statement against the Experian identity check.
+
     for (var ri = 0; ri < rows.length; ri++) {
       var t = (rows[ri].text || '').trim();
       if (/PENGENALAN|KWSP|MAJIKAN/i.test(t)) break;
       if (EPF_NOT_NAME.test(t)) continue;
       if (/^[A-Z][A-Z\s@\/'.-]{5,}$/.test(t) && !/\d/.test(t)) {
         if (/\b(BINTI|BIN|A\/L|A\/P|D\/O|S\/O)\b/i.test(t)) { epfName = t; break; }
-        if (!epfName) epfName = t;   // fallback = first uppercase alpha line
+        if (!epfName) epfName = t;
       }
     }
     if (epfName) debug.push('epf name=' + epfName);
@@ -396,8 +430,7 @@
       found.push(entry);
       debug.push('month ' + entry.label + ' ahli=' + entry.employee);
     });
-    // a month can appear on several statement rows (e.g. two Jun-25 lines:
-    // salary + arrears/bonus posting) -> SUM them into one month entry
+
     var byKey = {};
     found.forEach(function (e) {
       var k = e.year * 12 + e.monthIndex;
@@ -423,10 +456,6 @@
     return res;
   }
 
-  /** Merge the month lists of SEVERAL EPF statements (e.g. 2025 + 2024
-      files) into one rolling 12-month timeline ending at the latest month.
-      The same month appearing in two different statements is NOT summed
-      (it is the same contribution reported twice) - the larger figure wins. */
   function mergeEPFMonths(results) {
     var byKey = {};
     results.forEach(function (res) {
@@ -437,24 +466,9 @@
     });
     return Object.keys(byKey).map(Number).sort(function (a, b) { return a - b; })
       .map(function (k) { return byKey[k]; })
-      .slice(-12); // latest 12 months across all files
+      .slice(-12);
   }
 
-  /* ============================================================
-     C) Payslip extraction and reconciliation.
-
-     Digital PDFs are read from their text layer. This is deliberately
-     layout-aware: Earnings and Deductions can sit side-by-side, and a line
-     such as Basic Salary may contain both a rate and the actual amount. We
-     use the table columns and take the amount column, not the first number.
-
-     Payslip formats are not standard. The parser maps common labels into the
-     existing income buckets, preserves evidence, skips summary/YTD/employer
-     amounts as input, then reconciles employee deductions against printed
-     gross, deduction-total and net-pay figures. It never edits calculation
-     policy. OCR for scanned/photo documents is a separate, local-only step;
-     the current double-click/file:// build has no safe general OCR worker.
-     ============================================================ */
   var PAYSLIP_SKIP = /\b(EMPLOYER|MAJIKAN|CARRY|Y-?T-?D|YEAR\s+TO\s+DATE|SEHINGGA)\b/i;
   var PAYSLIP_SUMMARY = /\b(NET\s*(PAY|SALARY)|TAKE\s?HOME|GROSS\s*(EARNINGS?|SALARY|PAY)|TOTAL\s*(DEDUCTIONS?|POTONGAN)|JUMLAH\s*(POTONGAN|PENDAPATAN)|GAJI\s*BERSIH)\b/i;
 
@@ -506,8 +520,7 @@
     if (lx === null) return null;
     var endX = fld.side === 'earning' && layout.sideBySide && layout.deductionX !== null
       ? layout.deductionX : Infinity;
-    // Bound the label's search to the next non-numeric label, but never cross
-    // from the left-hand Earnings table into the right-hand Deductions table.
+
     (row.items || []).forEach(function (it) {
       if (it.x > lx && payMoney(it.str) === null && it.x < endX) endX = it.x;
     });
@@ -517,10 +530,7 @@
       return true;
     });
     if (!candidates.length) return null;
-    // A payslip may show rate/hours then amount (e.g. 31.00 3,800.00).
-    // In an earnings cell, take the rightmost amount in that table column.
-    // A deduction line usually has one current-period amount; take the first
-    // amount after its label after the YTD column has been excluded.
+
     candidates.sort(function (a, b) { return a.x - b.x; });
     return fld.side === 'earning' ? candidates[candidates.length - 1] : candidates[0];
   }
@@ -570,9 +580,7 @@
       var l = byPage[page];
       l.sideBySide = l.earningY !== null && l.deductionY !== null &&
         Math.abs(l.earningY - l.deductionY) <= 5;
-      // A later statutory table often has its own Current Month / YTD columns.
-      // Those positions must not be used to exclude the primary itemized
-      // earnings/deductions table above it.
+
       rows.forEach(function (row) {
         if ((row.page || 1) !== +page) return;
         if (l.statutoryY !== null && row.y <= l.statutoryY) return;
@@ -597,14 +605,6 @@
     if (layout.deductionY !== null) return row.y < layout.earningY && row.y > layout.deductionY;
     return false;
   }
-  function textAfterLabel(rows, re) {
-    for (var i = 0; i < rows.length; i++) {
-      var text = String(rows[i].text || '');
-      var m = text.match(re);
-      if (m && m[1]) return m[1].trim().replace(/\s{2,}.*/, '');
-    }
-    return '';
-  }
   function summaryAmount(row, labelRe, nextLabelRe) {
     var items = row.items || [], start = null, end = Infinity;
     for (var i = 0; i < items.length; i++) {
@@ -618,7 +618,6 @@
     return vals.length ? vals[0] : null;
   }
 
-  /** Pure text-row parser; accepts rows from PDF.js or OCR with word boxes. */
   function parsePayslipRows(rows) {
     rows = rows || [];
     var debug = [], lineItems = [];
@@ -634,15 +633,13 @@
       var page = row.page || 1, layout = layouts[page] || { deductionX: null,
         deductionY: null, earningY: null, sideBySide: false, ytdX: null,
         statutoryY: null, summaryY: null };
-      // Employee identity and payroll period are context, never income rows.
+
       var name = text.match(/\bEMPLOYEE\s+NAME\s*:?\s*(.+?)(?=\s{2,}|\s+(?:DEPARTMENT|POSITION|I\/?C\s+NO)\b|$)/i);
       if (name && !r.employeeName) r.employeeName = name[1].trim();
       var ic = text.match(/\bI\/?C\s+NO\.?\s*:?\s*([\d-]{6,})/i);
       if (ic && !r.ic) r.ic = ic[1].replace(/\D/g, '');
       if (/\b(GROSS\s*(EARNINGS?|PAY)|TOTAL\s*DEDUCTIONS?|NET\s*PAY|GAJI\s*BERSIH)\b/i.test(text)) summaryRows.push(row);
 
-      // The statutory current-month/YTD table repeats EPF/SOCSO/EIS. It is
-      // evidence for validation only; never count it as another deduction.
       if (layout.statutoryY !== null && row.y <= layout.statutoryY) return;
       if (PAYSLIP_SKIP.test(text)) return;
       var toks = payMoneyTokens(row);
@@ -662,9 +659,6 @@
         debug.push(fld.key + (fld.add ? ' +=' : ' =') + pick.v + ' [' + text.slice(0, 42) + ']');
       });
 
-      // An unrecognised amount in the Earnings section is still income. Send
-      // it to Other Income; if the row already matched a known earning label,
-      // don't mistake a rate/hours token left over on that row for income.
       if (!knownEarning && isEarningRow(row, layout) && !PAYSLIP_SUMMARY.test(text)) {
         var earnings = toks.filter(function (t) {
           if (consumed[t.i] || (layout.ytdX !== null && t.x >= layout.ytdX)) return false;
@@ -679,8 +673,6 @@
         }
       }
 
-      // Unknown amounts in the employee-deduction column go to Other
-      // Deductions (e.g. SKBBK). Never use unrelated rate or YTD columns.
       if (!knownDeduction && isDeductionRow(row, layout) && !PAYSLIP_SUMMARY.test(text)) {
         var remaining = toks.filter(function (t) {
           if (consumed[t.i] || (layout.ytdX !== null && t.x >= layout.ytdX)) return false;
@@ -696,8 +688,6 @@
       }
     });
 
-    // Printed summary values are for reconciliation only, not calculation
-    // inputs. When gross and deduction total share a row, use their x ranges.
     summaryRows.forEach(function (row) {
       var g = summaryAmount(row, /GROSS\s*(EARNINGS?|PAY)/i, /TOTAL\s*DEDUCTIONS?/i);
       var d = summaryAmount(row, /TOTAL\s*DEDUCTIONS?/i, /NET\s*PAY/i);
@@ -706,7 +696,7 @@
       if (d !== null) r.totalDeduction = d;
       if (n !== null) r.netPay = n;
     });
-    // OCR or text variants sometimes place each summary label in separate rows.
+
     summaryRows.forEach(function (row) {
       var toks = payMoneyTokens(row), text = row.text || '';
       if (r.grossPay === null && /GROSS\s*(EARNINGS?|PAY)/i.test(text) && toks.length) r.grossPay = toks[toks.length - 1].v;
@@ -721,9 +711,7 @@
   function payslipReconciliation(r) {
     var deductions = (r.epf || 0) + (r.pcb || 0) + (r.socso || 0) +
       (r.eis || 0) + (r.otherDeduction || 0);
-    // Reconcile using the earnings we actually extracted, not the printed
-    // gross total. Otherwise a missed salary line could still appear to pass
-    // because printed gross - deductions equals printed net.
+
     var extractedGross = (r.basic || 0) + (r.fixedAllowance || 0) +
       (r.other || 0) + (r.commission || 0) + (r.ot || 0);
     var expectedNet = extractedGross - deductions;
@@ -754,6 +742,7 @@
   Engine.pdfAvailable = pdfAvailable;
   Engine.extractFromExperian = extractFromExperian;
   Engine.parseExperianRows = parseExperianRows;
+  Engine.parseBankCCRISRows = parseBankCCRISRows;
   Engine.extractTextRows = getTextRows;
   Engine.extractFromEPFStatement = extractFromEPFStatement;
   Engine.isEPFStatementRows = isEPFStatementRows;

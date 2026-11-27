@@ -1,17 +1,5 @@
-/* ============================================================
-   ndiPricing.js - PF NDI profit-rate pricing matrices
-   Exported from the "List" sheet of
-   "CCRIS DSR EVALUATION REPORT 2025 23122025.xlsm" (23 Dec 2025):
-     Flat Rate  OTHERS : List!AQ5:AZ14 / AQ19:AZ28 / AQ33:AZ42 / AQ47:AZ56
-     EPR        OTHERS : List!AE5:AN14 / AE19:AN28 / AE33:AN42 / AE47:AN56
-     Flat/EPR   MICRO 1: List!BW5:CF14  / BK5:BT14
-     Flat/EPR   MICRO 2: List!BW19:CF28 / BK19:BT28
-     Max financing by risk grade: List!BC4:BD10
-     Product classification (amount): List!CO:CP
-   Matrix axes: row = Experian risk grade 1-10, column = tenure
-   in whole YEARS 1-10 (Excel MATCH is exact - H114 = months/12).
-   Rates are fractions per year (0.13496 = 13.496% p.a.). null = NA.
-   ============================================================ */
+/* ---------------- NDI pricing table ---------------- */
+
 (function () {
   'use strict';
   window.Engine = window.Engine || {};
@@ -19,9 +7,9 @@
   var N = null;
   function na3() { return [[N,N,N,N,N,N,N,N,N,N],[N,N,N,N,N,N,N,N,N,N],[N,N,N,N,N,N,N,N,N,N]]; }
 
-  /* ---------- OTHERS: flat rate, 4 income bands ---------- */
+  /* ---------------- others flat rate ---------------- */
   var FLAT_OTHERS = [
-    // band 0: gross income 3,000 - 4,999  (List!AQ5:AZ14)
+
     na3().concat([
       [0.15478666666666666,0.15664666666666666,0.16173777777777779,0.16706,0.17276266666666665,0.18396666666666664,0.19079047619047618,0.19734166666666664,N,N],
       [0.12857333333333335,0.12949333333333332,0.13306222222222222,0.13679333333333332,0.140912,0.1503511111111111,0.1556857142857143,0.16086666666666666,N,N],
@@ -31,7 +19,7 @@
       [0.07598666666666666,0.07627333333333333,0.09300888888888889,0.09489666666666666,0.097136,0.10432222222222223,0.10774285714285714,0.11109833333333333,N,N],
       [0.06249333333333333,0.06752,0.08944444444444444,0.09119333333333333,0.09328533333333333,0.09961777777777779,0.1028590476190476,0.10603833333333335,N,N]
     ]),
-    // band 1: 5,000 - 14,999  (List!AQ19:AZ28)
+
     na3().concat([
       [0.11472000000000002,0.11527333333333334,0.11815555555555554,0.12307666666666667,0.12721333333333334,0.13877777777777778,0.14361333333333334,0.148325,N,N],
       [0.08593333333333333,0.0863,0.08802222222222222,0.11318666666666666,0.11686133333333332,0.13066,0.1351504761904762,0.139535,N,N],
@@ -41,7 +29,7 @@
       [0.0622,0.0624,0.0634,0.0824,0.0845,0.0925,0.095,0.0976,N,N],
       [0.0564,0.0568,0.0577,0.0785,0.0805,0.0883,0.0907,0.0931,N,N]
     ]),
-    // band 2: 15,000 - 29,999  (List!AQ33:AZ42)
+
     na3().concat([
       [0.10956000000000002,0.10999333333333333,0.11263111111111111,0.11599666666666666,0.1198,0.1295288888888889,0.13397333333333333,0.13831166666666667,N,N],
       [0.0752,0.07321333333333334,0.0745288888888889,0.10684333333333332,0.110232,0.11944888888888888,0.1234742857142857,0.12741333333333332,N,N],
@@ -51,7 +39,7 @@
       [0.0584,0.0586,0.0595,0.079,0.081,0.0873,0.0896,0.092,N,N],
       [0.0551,0.0555,0.0564,0.0766,0.0785,0.0847,0.0869,0.0892,N,N]
     ]),
-    // band 3: >= 30,000  (List!AQ47:AZ56)
+
     na3().concat([
       [0.10096,0.10124,0.10351555555555556,0.10772666666666667,0.111816,0.11903111111111112,0.12304,0.12696333333333334,N,N],
       [0.07181333333333334,0.06982666666666666,0.07105333333333333,0.09744333333333334,0.10042933333333331,0.10709555555555555,0.1106247619047619,0.11408666666666667,N,N],
@@ -63,7 +51,7 @@
     ])
   ];
 
-  /* ---------- OTHERS: EPR (effective rate), same 4 bands ---------- */
+  /* ---------------- others effective rate ---------------- */
   var EPR_OTHERS = [
     na3().concat([
       [0.27440000000000003,0.27670000000000006,0.278,0.2783,0.27880000000000005,0.28650000000000003,0.2882,0.2897,N,N],
@@ -103,21 +91,21 @@
     ])
   ];
 
-  /* ---------- MICRO packages (financing-amount based) ---------- */
+  /* ---------------- MICRO packages (financing-amount based) ---------------- */
   function microGrid(g4, g5to10) {
     var grid = na3();
     grid.push(g4);
     for (var i = 0; i < 6; i++) grid.push(g5to10.slice());
     return grid;
   }
-  // MICRO 1: amount RM10,000 and below (List!BW5:CF14 / BK5:BT14)
+
   var FLAT_MICRO1 = microGrid(
     [0.11178666666666667,0.11180666666666667,0.11183555555555555,0.11178666666666667,0.111816,N,N,N,N,N],
     [0.07181333333333334,0.0718,0.07180444444444445,0.07181333333333334,0.07181066666666666,N,N,N,N,N]);
   var EPR_MICRO1 = microGrid(
     [0.2003,0.2018,0.1987,0.1947,0.1908,N,N,N,N,N],
     [0.13,0.1323,0.1314,0.1298,0.128,N,N,N,N,N]);
-  // MICRO 2: amount RM10,500 - RM20,000 (List!BW19:CF28 / BK19:BT28)
+
   var FLAT_MICRO2 = microGrid(
     [0.11178666666666667,0.11180666666666667,0.11183555555555555,0.11178666666666667,0.111816,N,N,N,N,N],
     [0.06081333333333333,0.06079999999999999,0.06084,0.06084666666666667,0.060792,N,N,N,N,N]);
@@ -130,13 +118,10 @@
     flatOthers: FLAT_OTHERS, eprOthers: EPR_OTHERS,
     flatMicro1: FLAT_MICRO1, eprMicro1: EPR_MICRO1,
     flatMicro2: FLAT_MICRO2, eprMicro2: EPR_MICRO2,
-    // Max financing per Experian risk grade (List!BC4:BD10) - used for
-    // the 3,000-4,999 gross-income eligibility band. Grades 1-3: no limit
-    // row in the Excel -> NOT ELIGIBLE.
+
     gradeMaxByRisk: { 4: 20000, 5: 30000, 6: 30000, 7: 40000, 8: 40000, 9: 50000, 10: 50000 }
   };
 
-  /** Experian risk grade 1-10 from the iScore (report legend page 7). */
   function riskGradeFromIScore(iScore) {
     var s = parseFloat(iScore);
     if (!isFinite(s) || s <= 0) return null;
@@ -152,10 +137,6 @@
     return 10;
   }
 
-  /** Product classification by financing amount (List!CO:CP - exact
-      RM500 steps, like the Excel's exact-match VLOOKUP): MICRO 1 =
-      1,000-10,000; MICRO 2 = 10,500-20,000; anything else OTHERS.
-      Micro pricing only applies when gross income >= 5,000 (I115). */
   function classifyPFProduct(amount, grossIncome) {
     var a = parseFloat(amount);
     if (!isFinite(a) || grossIncome < 5000 || a % 500 !== 0) return 'OTHERS';
@@ -167,17 +148,11 @@
   function pick(grid, riskGrade, tenureMonths) {
     if (!grid || riskGrade == null) return null;
     var yrs = tenureMonths / 12;
-    var t = NDI_PRICING.tenureYears.indexOf(yrs);      // exact match, like Excel
+    var t = NDI_PRICING.tenureYears.indexOf(yrs);
     if (t < 0 || riskGrade < 1 || riskGrade > 10) return null;
     return grid[riskGrade - 1][t];
   }
 
-  /**
-   * Profit-rate lookup (Excel G115/H115/I115/J115).
-   * Returns { product, flat, epr } - rates as fractions p.a., null = NA.
-   */
-  /** Admin-overridable grid: Engine.CONFIG.pfMatrices.<key> replaces the
-      shipped grid when the admin has saved an edited matrix. */
   function grid(key, fallback) {
     var o = window.Engine.CONFIG && window.Engine.CONFIG.pfMatrices;
     return (o && o[key]) || fallback;

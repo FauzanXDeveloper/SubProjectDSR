@@ -1,80 +1,148 @@
-/* ============================================================
-   core/ui.js - shared helpers used by every product panel
-   (number parsing, escaping, tiles, gauge, field builders).
-   Also the product registry and the Malaysian date helper.
-   ============================================================ */
+/* ---------------- shared controls ---------------- */
+
 (function () {
   'use strict';
-  var App = window.App = window.App || {};
-  var E = window.Engine;
-  var App = window.App = window.App || {};
-  var E = window.Engine;
-  var fmt = E.formatCurrency;
-  var amt = E.formatAmount;      // CCRIS grids: bare numbers, no RM
-  var fmtPct = E.formatPct;
-  // every DSR reading is shown to 2 dp; thresholds stay whole (fmtPct(x, 0))
-  var DSR_DP = 2;
-  function num(v) { var n = parseFloat(String(v == null ? '' : v).replace(/[,\s%]/g, '')); return isFinite(n) ? n : 0; }
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  var CalculatorApp = window.App = window.App || {};
+  var calculatorEngine = window.Engine;
+
+  var formatCurrency = calculatorEngine.formatCurrency;
+  var formatAmount = calculatorEngine.formatAmount;
+  var formatPercent = calculatorEngine.formatPct;
+
+  var DSR_DECIMALS = 2;
+
+  function parseNumber(value) {
+    var cleaned = String(value == null ? '' : value).replace(/[,\s%]/g, '');
+    var number = parseFloat(cleaned);
+    return isFinite(number) ? number : 0;
   }
-  function el(id) { return document.getElementById(id); }
-  // Officer-facing decision is two-state (APPROVED green / REJECTED red);
-  // the internal Excel-parity verdicts still drive the class via the engine.
-  function vClass(verdict) { return E.verdictClass(verdict); }
-  function vLabel(verdict) { return E.verdictLabel(verdict); }
-  function tile(label, value, cls) {
-    return '<div class="tile' + (cls ? ' ' + cls : '') + '"><div class="t-label">' + label +
-      '</div><div class="t-value">' + value + '</div></div>';
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
-  /** The bar still turns red once the DSR is over the limit (that is the
-      verdict), but the limit itself is never drawn or named: the marker line
-      and the "Threshold x%" caption are deliberately gone so the capping
-      thresholds stay internal. */
-  function gauge(dsr, threshold) {
-    var pct = Math.min(100, Math.max(0, dsr * 100));
+
+  function getElementById(elementId) {
+    return document.getElementById(elementId);
+  }
+
+  function verdictClass(verdict) {
+    return calculatorEngine.verdictClass(verdict);
+  }
+
+  function verdictLabel(verdict) {
+    return calculatorEngine.verdictLabel(verdict);
+  }
+
+  function metricTile(label, value, extraClass) {
+    return '<div class="tile' + (extraClass ? ' ' + extraClass : '') + '">' +
+      '<div class="t-label">' + label + '</div>' +
+      '<div class="t-value">' + value + '</div></div>';
+  }
+
+  function drawDsrGauge(dsr, threshold) {
+    var widthPercent = Math.min(100, Math.max(0, dsr * 100));
     return '<div class="gauge"><div class="fill' + (dsr > threshold ? ' over' : '') +
-      '" style="width:' + pct + '%"></div></div>' +
-      '<div class="gauge-cap"><span>DSR ' + fmtPct(dsr, DSR_DP) + '</span></div>';
+      '" style="width:' + widthPercent + '%"></div></div>' +
+      '<div class="gauge-cap"><span>DSR ' + formatPercent(dsr, DSR_DECIMALS) + '</span></div>';
   }
-  /** Numeric fields are text inputs with a display format derived from
-      the label: "(RM" -> money, "(%)" -> pct, tenure/years/months -> int.
-      format.js formats on blur/Enter; num() strips commas/% back out. */
-  function field(label, id, value, opts) {
-    opts = opts || {};
-    var kind = opts.fmt;
-    if (kind == null && !opts.text) {
-      if (label.indexOf('(RM') !== -1) kind = 'money';
-      else if (label.indexOf('(%)') !== -1) kind = 'pct';
-      else if (/tenure|years|months|grace/i.test(label)) kind = 'int';
+
+  function numberField(label, inputId, value, options) {
+    options = options || {};
+    var inputKind = options.fmt;
+
+    if (inputKind == null && !options.text) {
+      if (/tenure|years|months|grace/i.test(label)) {
+        inputKind = 'int';
+      } else if (label.indexOf('(%)') !== -1) {
+        inputKind = 'pct';
+      } else if (label.indexOf('(RM') !== -1 ||
+        /financing|property value|mrtt|valuation|legal|stamping|instal+ment|cost|\bamount\b|\bctf\b|credit limit/i.test(label)) {
+        inputKind = 'money';
+      }
     }
-    var shown = kind ? App.fmtInput(value, kind) : value;
+
+    var shownValue = inputKind ? CalculatorApp.fmtInput(value, inputKind) : value;
+
     return '<div class="field"><label>' + label + '</label>' +
       '<input class="editable" type="text"' +
-      (kind ? ' inputmode="decimal" data-fmt="' + kind + '"' : '') +
-      ' id="' + id + '" value="' + esc(shown) + '"></div>';
+      (inputKind ? ' inputmode="decimal" data-fmt="' + inputKind + '"' : '') +
+      ' id="' + inputId + '" value="' + escapeHtml(shownValue) + '"></div>';
   }
-  function bindNum(id, obj, key) {
-    var n = el(id);
-    if (n) n.oninput = function () { obj[key] = this.value; App.refreshOutputs(); };
+
+  function bindNumberInput(inputId, targetObject, propertyName) {
+    var inputElement = getElementById(inputId);
+    if (!inputElement) {
+      return;
+    }
+    inputElement.oninput = function () {
+      targetObject[propertyName] = this.value;
+      CalculatorApp.refreshOutputs();
+    };
   }
-  function cardShell(id, title, bodyHtml) {
-    return '<div class="card" id="' + id + '"><div class="card-head" data-toggle="' + id + '">' +
+
+  function collapsibleCard(cardId, title, bodyHtml) {
+    return '<div class="card" id="' + cardId + '">' +
+      '<div class="card-head" data-toggle="' + cardId + '">' +
       '<span>' + title + '</span><span class="chev">&#9662;</span></div>' +
       '<div class="card-body">' + bodyHtml + '</div></div>';
   }
 
-  App.today = function () {
+  CalculatorApp.today = function () {
     return new Date(Date.now() + 8 * 60 * 60000).toISOString().slice(0, 10);
   };
-  App.products = [];
-  App.registerProduct = function (p) { App.products.push(p); };
-  App.runSeed = function (id) {
-    App.products.forEach(function (p) {
-      if (p.id === id && p.seed && App[p.seed]) App[p.seed]();
+
+  /* ---------------- product registry ---------------- */
+  CalculatorApp.products = [];
+
+  CalculatorApp.registerProduct = function (product) {
+    CalculatorApp.products.push(product);
+  };
+
+  CalculatorApp.runSeed = function (productId) {
+    CalculatorApp.products.forEach(function (product) {
+      if (product.id === productId && product.seed && CalculatorApp[product.seed]) {
+        CalculatorApp[product.seed]();
+      }
     });
   };
-  App.mod = App.mod || {};
-  App.mod.ui = { fmt: fmt, amt: amt, fmtPct: fmtPct, DSR_DP: DSR_DP, num: num, esc: esc, el: el, vClass: vClass, vLabel: vLabel, tile: tile, gauge: gauge, field: field, bindNum: bindNum, cardShell: cardShell };
+
+  CalculatorApp.mod = CalculatorApp.mod || {};
+
+  CalculatorApp.mod.ui = {
+
+    formatCurrency: formatCurrency,
+    formatAmount: formatAmount,
+    formatPercent: formatPercent,
+    parseNumber: parseNumber,
+    escapeHtml: escapeHtml,
+    getElementById: getElementById,
+    verdictClass: verdictClass,
+    verdictLabel: verdictLabel,
+    metricTile: metricTile,
+    drawDsrGauge: drawDsrGauge,
+    numberField: numberField,
+    bindNumberInput: bindNumberInput,
+    collapsibleCard: collapsibleCard,
+    DSR_DECIMALS: DSR_DECIMALS,
+
+    fmt: formatCurrency,
+    amt: formatAmount,
+    fmtPct: formatPercent,
+    num: parseNumber,
+    esc: escapeHtml,
+    el: getElementById,
+    vClass: verdictClass,
+    vLabel: verdictLabel,
+    tile: metricTile,
+    gauge: drawDsrGauge,
+    field: numberField,
+    bindNum: bindNumberInput,
+    cardShell: collapsibleCard,
+    DSR_DP: DSR_DECIMALS
+  };
 })();

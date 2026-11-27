@@ -1,28 +1,11 @@
-/* ============================================================
-   ARBM Unified Financing Calculator - stylesheet
-   Look: calm banking ledger. Deep ARB navy ink, quiet paper
-   background, hairline borders; a single brand-gold accent
-   (the Al Rajhi palm) reserved for step tags + active nav.
-   Alignment: every table column and every field / metric box is
-   centred - headers, values, money included. Money keeps
-   font-variant-numeric: tabular-nums so digits stay a fixed width.
-   Not touched: multi-line textareas (centred prose is unreadable) and
-   layout chrome - sidebar nav, report header/footer.
+/* ---------------- base ---------------- */
 
-   Cell convention (identical across PF / HF / CC):
-   plain white = editable, ice blue = calculated/read-only.
-   Editable and override fields used to carry a pale-gold / apricot
-   tint; they are now flat, so an input's border alone marks it as
-   typeable and a read-only value stays the only tinted thing on the
-   form. The --editable / --override variables are kept (rather than
-   the rules deleted) so the cue can be restored in one place.
-   ============================================================ */
 :root {
-  --primary: #0F4C81;          /* ARB navy */
-  --dark: #16324F;             /* header ink */
+  --primary: #0F4C81;
+  --dark: #16324F;
   --ink: #1B2735;
-  --accent: #9E2B25;           /* deep red - fail / NLCI marker */
-  --gold: #C89B3C;             /* brand gold - the one accent */
+  --accent: #9E2B25;
+  --gold: #C89B3C;
   --gold-soft: #F5ECD7;
   --bg: #F6F7F9;
   --panel: #FFFFFF;
@@ -58,11 +41,11 @@ body {
 
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 
+body.auth-locked .layout { display: none !important; }
+
 /* ---------------- layout ---------------- */
 .layout { display: flex; min-height: 100vh; }
 
-/* The navigation rail: one flat navy surface, a hairline divider, and the
-   brand gold used only for the active product and its icon. */
 .sidebar {
   width: var(--sidebar-w);
   background: #12283F;
@@ -74,6 +57,9 @@ body {
   top: 0;
   height: 100vh;
   border-right: 1px solid rgba(255,255,255,.07);
+
+  box-shadow: 6px 0 18px -6px rgba(0, 0, 0, .38);
+  z-index: 5;
 }
 
 /* ---------------- brand ---------------- */
@@ -92,7 +78,7 @@ body {
 .brand-logo .logo-mark { display: none; }
 
 /* ---------------- scrolling nav ---------------- */
-/* brand (above) and foot (below) stay put; only the product list scrolls */
+
 .sidebar-scroll {
   flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
   padding: 0 10px 8px;
@@ -109,7 +95,6 @@ body {
   color: rgba(255,255,255,.4);
 }
 
-/* product rows: rounded pill, faint hover, gold bar + gold icon when active */
 .nav-item {
   position: relative;
   display: flex; align-items: center; gap: 10px;
@@ -182,8 +167,6 @@ body {
 .layout.sidebar-collapsed .foot { padding: 12px 8px; }
 .layout.sidebar-collapsed #btn-collapse svg { transform: rotate(180deg); }
 
-/* no max-width: the content column fills the space left by the sidebar, so
-   there is no dead strip on the right of a wide screen */
 .main { flex: 1; padding: 22px 30px 70px; min-width: 0; }
 .topbar {
   display: flex; align-items: baseline; justify-content: space-between;
@@ -209,7 +192,7 @@ body {
   overflow: hidden;
   box-shadow: 0 1px 2px rgba(22, 50, 79, .05);
 }
-.card .card {                    /* nested cards (joint applicant sub steps) */
+.card .card {
   box-shadow: none;
   border-color: var(--border-strong);
 }
@@ -259,7 +242,7 @@ body {
   margin-bottom: 4px; font-weight: 600; letter-spacing: .01em;
   text-align: center;
 }
-/* compact field for small values like the EPF contribution rate (%) */
+
 .field.narrow { max-width: 130px; }
 input, select, textarea {
   font: inherit; color: var(--text);
@@ -276,17 +259,14 @@ input:focus, select:focus, textarea:focus {
   outline: none;
 }
 input[type="number"] { font-variant-numeric: tabular-nums; }
-/* every field box reads centred (see "Alignment" note at the top).
-   textarea is left out on purpose: it holds multi-line free text
-   (checker comments, maker replies) and centred prose is unreadable. */
+
 input, select { text-align: center; }
 input.editable, select.editable, td.editable input, td.editable select {
   background: var(--editable);
   border-color: var(--editable-border);
 }
-/* an applied override no longer gets its own fill - it reads as a normal
-   typed-in value; the cell keeps whatever the row's background is */
-input.override-active, td.override input.has-value {
+
+td.override input.has-value {
   background: transparent !important;
   border-color: var(--override-border) !important;
 }
@@ -309,9 +289,7 @@ input.readonly {
   font-variant-numeric: tabular-nums;
 }
 .readonly-val.left { text-align: center; }
-/* long extracted values (name/IC) stay on one line; full text via title tooltip,
-   so a long name no longer grows the Step A row and pushes the layout down */
-.readonly-val.ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 .legend { display: flex; gap: 14px; font-size: 11px; color: var(--muted); margin-bottom: 12px; flex-wrap: wrap; }
 .legend .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; border: 1px solid var(--border-strong); }
 
@@ -321,11 +299,14 @@ input.readonly {
   border: 1px solid var(--border);
   border-radius: 6px;
 }
+
+.ccris-wrap { scrollbar-width: none; -ms-overflow-style: none; }
+.ccris-wrap::-webkit-scrollbar { width: 0; height: 0; display: none; }
 table.tbl { border-collapse: collapse; width: 100%; font-size: 12.5px; }
 table.tbl th {
   background: #F1F4F8; color: var(--dark);
   padding: 8px; text-align: center; font-weight: 650;
-  /* let long headers wrap onto 2+ lines (keeps columns narrow) and centre them */
+
   white-space: normal; vertical-align: middle;
   font-size: 11.5px; letter-spacing: .02em;
   border-bottom: 2px solid var(--primary);
@@ -336,24 +317,79 @@ table.tbl td {
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
-/* Inputs fill their cell and may shrink to 0, so the CCRIS/income tables
-   fit the content width by default and only scroll (via .tbl-wrap) once the
-   window is too narrow. !important overrides the per-field inline min-widths. */
+
 table.tbl td input, table.tbl td select {
   border: none; border-radius: 3px; padding: 5px 6px;
   min-width: 0 !important; width: 100%; box-shadow: none;
 }
+
+table.tbl td select {
+  -webkit-appearance: none; appearance: none;
+  border: 1px solid var(--border-strong); border-radius: 4px;
+  background-color: var(--panel);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236B7C91' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 5px center;
+  padding-right: 16px !important;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+table.tbl td select:focus { border-color: var(--primary); }
+table.tbl td select option { background: var(--panel); color: var(--text); }
+
+table.tbl .dd { position: relative; }
+table.tbl .dd-btn {
+  width: 100%; min-height: 22px; display: flex; align-items: center;
+  justify-content: space-between; gap: 4px;
+  border: 1px solid var(--border-strong); border-radius: 4px;
+  background: var(--panel); color: var(--text);
+  font: inherit; font-size: 11.5px; padding: 3px 5px; cursor: pointer;
+  text-align: left;
+}
+table.tbl .dd-btn:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+table.tbl .dd-val { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.tbl .dd-arrow {
+  flex: 0 0 auto; width: 0; height: 0;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+  border-top: 5px solid #6B7C91;
+}
+table.tbl .dd.edited .dd-btn { color: var(--accent) !important; font-weight: 700; }
+.dd-menu {
+  position: fixed; z-index: 4000; background: var(--panel);
+  border: 1px solid var(--border-strong); border-radius: 6px;
+  box-shadow: 0 10px 26px rgba(16, 32, 48, .28);
+  padding: 4px; display: grid;
+  grid-template-columns: repeat(2, minmax(128px, 1fr)); gap: 2px;
+}
+.dd-item {
+  border: 0; background: transparent; color: var(--text);
+  font: inherit; font-size: 11.5px; padding: 5px 8px; border-radius: 4px;
+  text-align: left; white-space: nowrap; cursor: pointer;
+}
+.dd-item:hover { background: var(--readonly); }
+.dd-item.sel { background: var(--readonly); color: var(--primary); font-weight: 700; }
+
+table.tbl td .income-dd { position: relative; display: block; }
+table.tbl td .income-dd input { width: 100%; padding-right: 15px; }
+table.tbl td .income-dd-toggle {
+  position: absolute; right: 0; top: 0; height: 100%; width: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; padding: 0; cursor: pointer;
+  color: var(--muted);
+}
+table.tbl td .income-dd-toggle:hover { color: var(--primary); }
+table.tbl td .income-dd-toggle:disabled { opacity: .35; cursor: default; }
+table.tbl td .income-dd-toggle .dd-arrow { border-top-color: currentColor; }
+.income-dd-menu { max-width: 340px; }
+
 table.tbl td input[data-fmt] { text-align: center; }
 table.tbl td.editable { background: transparent; }
 table.tbl td.editable input, table.tbl td.editable select { background: transparent; }
 table.tbl td.readonly { background: var(--readonly); text-align: center; font-weight: 600; color: var(--dark); }
 table.tbl td.override { background: transparent; }
 table.tbl td.override input { background: transparent; }
-/* stress-test commitment actually carrying a floating-rate uplift
-   (Floating Rate = YES); non-floating lines just repeat the commitment */
+
 table.tbl td.readonly.stressed { background: var(--warn-soft); color: var(--warn); }
-/* an extra facility line on the SAME account (same No + date) - no number of
-   its own, and no top border, so it reads as part of the account above */
+
 table.tbl tr.sub-line td { border-top: 0; }
 table.tbl tr.sub-line td:first-child { border-right: 0; }
 table.tbl tr.total-row td {
@@ -362,7 +398,6 @@ table.tbl tr.total-row td {
   border-top: 2px solid var(--primary);
 }
 
-/* CCRIS row source differentiation: original vs NLCI vs manually added */
 table.tbl tr.sec-row td {
   background: #FAFBFC; color: var(--muted);
   font-weight: 700; font-size: 11px;
@@ -375,14 +410,12 @@ table.tbl tr.src-USER_ADDED td:first-child { border-left: 4px solid var(--gold);
 table.tbl tr.src-NLCI td:not(.readonly) { background: #FCF7F6; }
 table.tbl tr.src-USER_ADDED td.editable { background: transparent; }
 table.tbl td.locked { background: #F7F9FB; color: var(--text); }
-/* Money columns keep tabular-nums so the digits stay the same width, but
-   are centred like every other column (see the "Alignment" note up top). */
+
 table.tbl td.num { text-align: center; }
 table.tbl th.num { text-align: center; }
 table.tbl td.override input, table.tbl td.readonly { text-align: center; }
 table.tbl tr.total-row td:not(.num) { text-align: center; }
 
-/* HOME ONE ACCOUNT results table: Term 1 / Term 2 / Total columns */
 table.hoa-tbl td.hoa-lbl { text-align: center; font-weight: 600; color: var(--dark); background: #fff; white-space: nowrap; }
 table.hoa-tbl td.hoa-total { background: var(--readonly); font-weight: 600; color: var(--dark); }
 table.hoa-tbl th.num { text-align: center; }
@@ -399,6 +432,95 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
   cursor: pointer; font-weight: 700; font-size: 15px; padding: 0 6px;
   border-radius: 4px;
 }
+
+/* ---------------- CCRIS grid ---------------- */
+table.tbl.ccris-tbl { font-size: 11.5px; table-layout: fixed; width: 100%; }
+table.tbl.ccris-tbl th { padding: 5px 4px; font-size: 10.5px; line-height: 1.25; }
+table.tbl.ccris-tbl td { padding: 2px 3px; }
+table.tbl.ccris-tbl td input { padding: 4px 3px; font-size: 11.5px; }
+table.tbl.ccris-tbl td select { padding: 4px 3px; font-size: 11.5px; padding-right: 15px; }
+table.tbl.ccris-tbl td input[type="date"] { font-size: 11px; }
+table.tbl.ccris-tbl tr.sec-row td { padding: 5px 6px; font-size: 10px; }
+table.tbl.ccris-tbl .row-del { font-size: 13px; padding: 0 3px; }
+table.tbl.ccris-tbl td.src-cell { font-size: 9px; letter-spacing: .02em; color: var(--muted); padding: 0 2px; }
+
+table.tbl.ccris-tbl col.c-no { width: 2%; }
+table.tbl.ccris-tbl col.c-date { width: 8%; }
+table.tbl.ccris-tbl col.c-cap { width: 8%; }
+table.tbl.ccris-tbl col.c-coll { width: 8%; }
+table.tbl.ccris-tbl col.c-fac { width: 10%; }
+table.tbl.ccris-tbl col.c-money { width: 8%; }
+table.tbl.ccris-tbl col.c-legal { width: 5%; }
+table.tbl.ccris-tbl col.c-float { width: 6%; }
+table.tbl.ccris-tbl col.c-src { width: 3%; }
+table.tbl.ccris-tbl col.c-del { width: 2%; }
+
+table.tbl td select[data-btf="link"] {
+  font-size: 11px; color: var(--primary); margin-bottom: 3px;
+  border-bottom: 1px dashed var(--border-strong);
+}
+table.tbl td input[data-btf="outstanding"]:disabled { color: var(--muted); }
+table.tbl td.src-cell { font-size: 9px; letter-spacing: .02em; color: var(--muted); padding: 0 2px; }
+
+/* ---------------- extracted-row / imported-income editing ---------------- */
+
+table.tbl td.row-actions { white-space: nowrap; }
+table.tbl .row-edit {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  padding: 1px 2px; border-radius: 4px; line-height: 1; vertical-align: middle;
+}
+
+table.tbl.ccris-tbl td.row-actions { padding: 0 1px; white-space: nowrap; }
+table.tbl.ccris-tbl .row-edit { padding: 0 1px; }
+table.tbl.ccris-tbl .row-del { padding: 0 2px; }
+table.tbl .row-edit:hover { color: var(--primary); background: var(--readonly); }
+table.tbl .row-edit.is-edited { color: var(--accent); }
+table.tbl .row-edit.done { color: var(--ok); }
+table.tbl .row-edit.done:hover { color: var(--ok); background: var(--ok-soft); }
+
+table.tbl td.edited-cell,
+table.tbl td.locked.edited-cell { color: var(--accent) !important; font-weight: 700; }
+table.tbl td input:disabled, table.tbl td select:disabled { color: var(--muted); }
+
+.income-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 2px 0 8px; padding: 7px 10px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--readonly);
+}
+.income-src-note { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+
+table.tbl input.edited, table.tbl select.edited,
+table.tbl input.edited:disabled, table.tbl select.edited:disabled {
+  color: var(--accent) !important; font-weight: 700;
+}
+
+/* ---------------- result surfaces ---------------- */
+
+#pf-out, #hf-out, #cc-out {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #FAFBFC;
+}
+.result-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 12px;
+}
+.result-card > .rc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
+}
+.result-card > .rc-head .rc-title {
+  font-size: 11.5px; font-weight: 700; color: var(--primary);
+  text-transform: uppercase; letter-spacing: .08em;
+}
+.result-card.stress { border-left: 3px solid var(--warn); }
+.result-card.stress > .rc-head .rc-title { color: var(--warn); }
+.result-card .gauge { margin-top: 4px; }
 
 .btn {
   display: inline-flex; align-items: center; gap: 7px;
@@ -457,18 +579,17 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
 .verdict.ok { background: var(--ok-soft); color: var(--ok); border: 1px solid #9FCDB2; }
 .verdict.fail { background: var(--fail-soft); color: var(--fail); border: 1px solid #E4A9A4; }
 .verdict.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid #DFC98A; }
-/* info = an open, non-terminal state (case returned to the maker) */
+
 .verdict.info { background: #E4EFF5; color: #1F6F92; border: 1px solid #A9CBDC; }
 
-/* Credit card visual (product chosen in Step A, shown in the CC panel) */
 .cc-card { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0 auto 16px; }
 .cc-card img { width: 220px; max-width: 60vw; height: auto; display: block; }
 .cc-card-name { font-size: 12px; font-weight: 700; color: var(--dark); letter-spacing: .05em; text-transform: uppercase; }
-/* one or two chosen cards side by side (BOTH = Platinum + Signature) */
+
 .cc-cards { display: flex; gap: 22px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
 .cc-cards .cc-card { margin: 0; }
 .cc-cards.both .cc-card img { width: 190px; }
-/* one application per applicant: HF+CC card list, PF+HF financing list */
+
 .cc-list, .pf-list { display: flex; flex-direction: column; gap: 16px; }
 .cc-app, .pf-app { border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 14px 16px; background: #FBFCFD; }
 .cc-app-head, .pf-app-head { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 6px; }
@@ -476,16 +597,20 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
 .cc-app-head .row-del, .pf-app-head .row-del { margin-bottom: 2px; }
 .cc-app .cc-cards { margin-top: 6px; }
 
-.tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); gap: 10px; }
+.tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 10px; }
 .tile {
   background: #FAFBFC;
   border: 1px solid var(--border);
-  border-radius: 6px; padding: 10px 12px;
+  border-radius: 8px; padding: 12px;
   text-align: center;
 }
-.tile .t-label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.tile .t-label {
+  font-size: 10.5px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .06em; line-height: 1.35; min-height: 28px;
+  display: flex; align-items: flex-end; justify-content: center;
+}
 .tile .t-value {
-  font-size: 16.5px; font-weight: 700; color: var(--dark); margin-top: 4px;
+  font-size: 18px; font-weight: 700; color: var(--dark); margin-top: 6px;
   font-variant-numeric: tabular-nums;
 }
 .tile.accent { background: var(--readonly); border-color: var(--readonly-border); }
@@ -496,8 +621,7 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
 .gauge { background: #E9EDF2; border-radius: 999px; height: 10px; position: relative; overflow: hidden; margin: 8px 0 3px; }
 .gauge .fill { height: 100%; background: var(--ok); border-radius: 999px; transition: width .2s; }
 .gauge .fill.over { background: var(--fail); }
-/* no threshold marker: the bar shows the DSR and turns red when it bursts,
-   but must never reveal where the capping threshold sits */
+
 .gauge-cap { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
 
 .notice {
@@ -538,7 +662,7 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
 .modal-title { margin: 0 0 6px; font-size: 17px; font-weight: 700; color: var(--dark); }
 .modal-msg {
   margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text);
-  white-space: pre-line; word-break: break-word;         /* keep \n from the caller */
+  white-space: pre-line; word-break: break-word;
   max-height: 52vh; overflow-y: auto;
 }
 .modal-actions {
@@ -546,7 +670,7 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
   margin-top: 22px; flex-wrap: wrap;
 }
 .modal-actions .btn { min-width: 96px; justify-content: center; }
-/* per-type accent: top border + icon chip */
+
 .modal-card.type-success { border-top-color: var(--ok); }
 .modal-card.type-success .modal-icon { background: var(--ok-soft); color: var(--ok); }
 .modal-card.type-warn { border-top-color: var(--gold); }
@@ -567,7 +691,7 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
   border-left: 3px solid var(--gold);
 }
 .combined-banner .cb-title { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--gold); }
-/* per-applicant DSR rows inside the combined banner (HF + CC/PF combos) */
+
 .combined-banner .cb-person {
   display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
   padding: 11px 0; border-top: 1px solid rgba(255,255,255,.14);
@@ -580,8 +704,7 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
 .combined-banner .cb-metric > span { display: block; font-size: 10px; opacity: .7; text-transform: uppercase; letter-spacing: .03em; }
 .combined-banner .cb-metric > b { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .combined-banner .cb-metric .cb-dsr { font-size: 17px; font-weight: 800; }
-/* single-DSR summary row (standalone products + PF+CC): one arranged row of
-   labelled metrics ending in the decision pill */
+
 .combined-banner .cb-single {
   display: flex; flex-wrap: wrap; gap: 14px 26px;
   margin-top: 10px; align-items: center;
@@ -589,14 +712,8 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
 .combined-banner .cb-single .cb-metric { text-align: center; }
 .combined-banner .cb-single .cb-metric > span { white-space: nowrap; }
 
-/* ---------------- signature ---------------- */
-.sig-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-.sig-box { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; background: #FAFBFC; }
-.sig-box canvas { border: 1.5px dashed var(--border-strong); border-radius: 6px; background: #fff; width: 100%; height: 110px; touch-action: none; cursor: crosshair; }
-
 /* ---------------- brand logo ---------------- */
-/* Expanded: the white wordmark sits directly on the navy sidebar (no chip).
-   Collapsed: the favicon mark keeps a small white chip so it stays legible. */
+
 .brand-logo {
   display: inline-flex; align-items: center;
   background: transparent; border-radius: 6px; padding: 0;
@@ -605,9 +722,6 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
 .layout.sidebar-collapsed .brand-logo {
   background: #fff; padding: 4px;
 }
-
-/* ---------------- print header (legacy, unused) ---------------- */
-.print-header { display: none; }
 
 /* ---------------- persistent on-screen footer ---------------- */
 .app-foot {
@@ -620,23 +734,19 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
   color: var(--muted);
 }
 
-/* ============================================================
-   Curated PDF / print report (#print-report, built by report.js)
-   Hidden on screen; the ONLY thing shown when printing.
-   ============================================================ */
+/* ---------------- printed pdf report ---------------- */
+
 #print-report { display: none; }
 
 @media print {
-  /* margin:0 removes the browser's own header/footer (the file:// URL, page
-     title and date). Our own page padding restores the printable margin. */
+
   @page { size: A4 portrait; margin: 0; }
   .layout { display: none !important; }
   html, body { background: #fff; }
   #print-report {
     display: block;
-    /* the extra bottom padding reserves the strip the running footer
-       (.rep-foot) occupies, so body content never runs underneath it */
-    padding: 13mm 12mm 24mm;
+
+    padding: 0 12mm;
     color: #1B2735;
     font-size: 10.5px;
     line-height: 1.4;
@@ -644,181 +754,145 @@ table.tbl .row-del:hover, .card-head .row-del:hover { color: var(--fail); backgr
   }
   #print-report * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-  /* THE REPORT IS INK ON PAPER - it must come out identical whether the
-     officer happens to be running the app in light or dark mode.
-     Every .rep-* rule below is written in terms of the design tokens, and
-     css/theme-dark.css redefines those tokens for the SCREEN: --dark and
-     --ink become near-white (#EAF0F8), --muted a pale blue-grey. Printing
-     from dark mode therefore put white text on white paper.
-     Pinning the light palette here - scoped to the report, inherited by
-     everything inside it - makes print theme-independent, and keeps the
-     rules below readable instead of littering them with literals. */
+  .rep-shell { width: 100%; border-collapse: collapse; }
+  .rep-shell > thead { display: table-header-group; }
+  .rep-shell > tfoot { display: table-footer-group; }
+  .rep-shell > thead > tr > td { padding: 13mm 0 0; vertical-align: top; }
+  .rep-shell > tfoot > tr > td { height: 20mm; padding: 0; }
+  .rep-shell > tbody > tr > td { padding: 0; vertical-align: top; }
+
   #print-report {
-    --primary: #0F4C81;
-    --dark: #16324F;
-    --ink: #1B2735;
-    --text: #1B2735;
-    --muted: #64748B;
-    --border: #E2E7EE;
-    --border-strong: #C9D3DE;
-    --readonly: #EEF4FA;
-    --readonly-border: #C9DCEE;
+    --primary: #1A1A1A;
+    --dark: #1A1A1A;
+    --ink: #1A1A1A;
+    --text: #1A1A1A;
+    --muted: #666666;
+    --border: #DDDDDD;
+    --border-strong: #BBBBBB;
+    --readonly: #F4F4F4;
+    --readonly-border: #CCCCCC;
     --panel: #FFFFFF;
-    --ok: #1B7A46;
-    --ok-soft: #E7F4EC;
-    --fail: #B3261E;
-    --fail-soft: #FBEAE8;
-    --warn: #96690F;
-    --warn-soft: #FBF3DD;
-    --gold: #C89B3C;
-    --accent: #9E2B25;
+    --ok: #1A1A1A;
+    --ok-soft: #F0F0F0;
+    --fail: #1A1A1A;
+    --fail-soft: #F0F0F0;
+    --warn: #1A1A1A;
+    --warn-soft: #F0F0F0;
+    --gold: #1A1A1A;
+    --accent: #1A1A1A;
   }
 
-  /* header band */
   .rep-head {
     display: flex; align-items: center; gap: 14px;
-    border-bottom: 2.5px solid var(--primary);
+    border-bottom: 1.5px solid #1A1A1A;
     padding-bottom: 9px; margin-bottom: 12px;
   }
   .rep-logo { height: 40px; width: auto; }
   .rep-head-txt { flex: 1; text-align: center; }
-  .rep-title { font-size: 16px; font-weight: 700; color: var(--dark); letter-spacing: -.01em; }
-  .rep-sub { font-size: 11px; color: var(--primary); font-weight: 600; margin-top: 1px; }
-  .rep-head-meta { text-align: right; font-size: 9.5px; color: var(--muted); }
+  .rep-title { font-size: 16px; font-weight: 700; color: #1A1A1A; letter-spacing: -.01em; }
+  .rep-sub { font-size: 11px; color: #444444; font-weight: 600; margin-top: 1px; }
+  .rep-head-meta { text-align: right; font-size: 9.5px; color: #666666; }
   .rep-head-meta div { margin-bottom: 2px; }
   .rep-head-meta span { display: block; text-transform: uppercase; letter-spacing: .06em; font-size: 8px; }
 
-  /* sections */
   .rep-sec { margin-bottom: 11px; break-inside: avoid; }
   .rep-h2 {
     font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em;
-    color: var(--primary); margin: 0 0 6px;
-    border-bottom: 1px solid var(--border-strong); padding-bottom: 3px;
+    color: #1A1A1A; margin: 0 0 6px;
+    border-bottom: 1px solid #999999; padding-bottom: 3px;
   }
 
-  /* definition grid */
   .rep-dl { display: grid; gap: 5px 18px; margin: 0; }
   .rep-dl.c2 { grid-template-columns: repeat(2, 1fr); }
   .rep-dl.c3 { grid-template-columns: repeat(3, 1fr); }
   .rep-dl-item { display: flex; justify-content: space-between; gap: 10px;
-    border-bottom: 1px dotted #D8DEE6; padding-bottom: 2px; }
-  .rep-dl-item dt { color: var(--muted); }
-  .rep-dl-item dd { margin: 0; font-weight: 600; color: var(--dark); text-align: right;
+    border-bottom: 1px dotted #D8D8D8; padding-bottom: 2px; }
+  .rep-dl-item dt { color: #666666; }
+  .rep-dl-item dd { margin: 0; font-weight: 600; color: #1A1A1A; text-align: right;
     font-variant-numeric: tabular-nums; }
 
-  /* key figures */
   .rep-figs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .rep-fig { border: 1px solid var(--border-strong); border-radius: 6px; padding: 7px 10px;
-    display: flex; flex-direction: column; gap: 2px; }
-  .rep-fig-l { font-size: 8.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-  .rep-fig-v { font-size: 14px; font-weight: 700; color: var(--dark); font-variant-numeric: tabular-nums; }
-  .rep-fig.accent { background: #EEF4FA; border-color: var(--readonly-border); }
-  .rep-fig.accent .rep-fig-v { color: var(--primary); }
-  .rep-fig.good { background: #E7F4EC; border-color: #BFDECB; }
-  .rep-fig.good .rep-fig-v { color: var(--ok); }
+  .rep-fig { border: 1px solid #CCCCCC; border-radius: 3px; padding: 7px 10px;
+    display: flex; flex-direction: column; gap: 2px; background: #FFFFFF; }
+  .rep-fig-l { font-size: 8.5px; text-transform: uppercase; letter-spacing: .05em; color: #666666; }
+  .rep-fig-v { font-size: 14px; font-weight: 700; color: #1A1A1A; font-variant-numeric: tabular-nums; }
+  .rep-fig.accent { background: #F7F7F7; border-color: #999999; }
+  .rep-fig.accent .rep-fig-v { color: #1A1A1A; }
+  .rep-fig.good { background: #EDEDED; border-color: #777777; }
+  .rep-fig.good .rep-fig-v { color: #1A1A1A; }
 
-  /* product decision blocks */
-  .rep-prod { border: 1px solid var(--border-strong); border-radius: 6px;
+  .rep-prod { border: 1px solid #CCCCCC; border-radius: 3px;
     padding: 8px 10px; margin-bottom: 8px; break-inside: avoid; }
   .rep-prod:last-child { margin-bottom: 0; }
-  .rep-prod-h { font-weight: 700; color: var(--dark); font-size: 11px;
-    margin-bottom: 5px; padding-bottom: 3px; border-bottom: 1px solid var(--border); }
+  .rep-prod-h { font-weight: 700; color: #1A1A1A; font-size: 11px;
+    margin-bottom: 5px; padding-bottom: 3px; border-bottom: 1px solid #DDDDDD; }
 
-  /* verdict pill */
-  .rep-pill { display: inline-block; padding: 1px 9px; border-radius: 999px;
-    font-weight: 700; font-size: 9.5px; letter-spacing: .04em; }
-  .rep-pill.ok { background: var(--ok-soft); color: var(--ok); border: 1px solid #9FCDB2; }
-  .rep-pill.fail { background: var(--fail-soft); color: var(--fail); border: 1px solid #E4A9A4; }
-  .rep-pill.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid #DFC98A; }
+  .rep-pill { display: inline-block; padding: 1px 8px; border-radius: 2px;
+    font-weight: 700; font-size: 9.5px; letter-spacing: .04em;
+    background: #FFFFFF; color: #1A1A1A; border: 1px solid #1A1A1A; }
+  .rep-pill.ok, .rep-pill.fail, .rep-pill.warn {
+    background: #FFFFFF; color: #1A1A1A; border: 1px solid #1A1A1A;
+  }
 
-  /* tables */
   .rep-tbl-wrap { margin-top: 7px; }
   .rep-tbl { border-collapse: collapse; width: 100%; font-size: 9.5px; }
-  .rep-tbl th { background: #F1F4F8; color: var(--dark); text-align: center;
-    padding: 4px 6px; font-weight: 700; border-bottom: 1.5px solid var(--primary); }
-  .rep-tbl td { padding: 3px 6px; border-bottom: 1px solid var(--border); }
+  .rep-tbl th { background: #F2F2F2; color: #1A1A1A; text-align: center;
+    padding: 4px 6px; font-weight: 700; border-bottom: 1px solid #1A1A1A; }
+  .rep-tbl td { padding: 3px 6px; border-bottom: 1px solid #DDDDDD; }
   .rep-tbl th.num, .rep-tbl td.num { text-align: center; font-variant-numeric: tabular-nums; }
-  .rep-tbl tr.rep-total td { font-weight: 700; background: #F1F4F8; border-top: 1.5px solid var(--primary); }
+  .rep-tbl tr.rep-total td { font-weight: 700; background: #F2F2F2; border-top: 1px solid #1A1A1A; }
 
-  /* combined / summary decision - arranged table */
-  .rep-dec-note { font-size: 9.5px; color: var(--muted); margin-bottom: 6px; }
+  .rep-dec-note { font-size: 9.5px; color: #666666; margin-bottom: 6px; }
   .rep-dec-tbl { margin-bottom: 8px; }
   .rep-dec-tbl td { vertical-align: middle; }
-  .rep-dec-build { font-size: 8.5px; color: var(--muted); }
-  .rep-dec-parts { font-size: 10px; color: var(--dark); margin-bottom: 6px; font-weight: 600; }
+  .rep-dec-build { font-size: 8.5px; color: #666666; }
+  .rep-dec-parts { font-size: 10px; color: #1A1A1A; margin-bottom: 6px; font-weight: 600; }
   .rep-dec-final {
     display: flex; align-items: center; gap: 10px;
-    border-top: 1.5px solid var(--primary); padding-top: 7px; margin-top: 2px;
+    border-top: 1px solid #1A1A1A; padding-top: 7px; margin-top: 2px;
   }
   .rep-dec-final > span {
     font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-    color: var(--dark);
+    color: #1A1A1A;
   }
 
-  /* sign-off */
-  .rep-sigs { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 4px; }
-  .rep-sig { break-inside: avoid; }
-  .rep-sig-role { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
-  .rep-sig-img { height: 46px; max-width: 100%; object-fit: contain; display: block; }
-  .rep-sig-blank { height: 46px; }
-  .rep-sig-line { border-top: 1px solid var(--ink); padding-top: 3px; font-weight: 700; color: var(--dark); }
-  .rep-sig-meta { font-size: 9px; color: var(--muted); margin-top: 2px; }
+  .rep-empty { color: #666666; font-style: italic; }
 
-  .rep-empty { color: var(--muted); font-style: italic; }
-  /* Running page footer. position:fixed repeats it at the foot of EVERY
-     printed page (the same mechanism .rep-stamp below relies on), so a
-     three-page case carries the copyright on all three, not just the last.
-     Opaque background: content is only padded clear of it, not clipped. */
   .rep-foot {
     position: fixed; left: 12mm; right: 12mm; bottom: 9mm;
-    padding-top: 5px; border-top: 1px solid var(--border);
-    font-size: 8px; line-height: 1.5; color: var(--muted); text-align: center;
+    padding-top: 5px; border-top: 1px solid #CCCCCC;
+    font-size: 8px; line-height: 1.5; color: #666666; text-align: center;
     background: #fff;
   }
 
-  /* decision watermark: repeats on every printed page (position:fixed) */
-  .rep-stamp {
-    position: fixed; top: 45%; left: 50%;
-    transform: translate(-50%, -50%) rotate(-18deg);
-    font-size: 64px; font-weight: 800; letter-spacing: .08em;
-    border: 6px solid; border-radius: 10px; padding: 6px 28px;
-    opacity: .28; z-index: 999; pointer-events: none;
-  }
-  .rep-stamp.approved { color: var(--ok); border-color: var(--ok); }
-  .rep-stamp.rejected { color: var(--fail); border-color: var(--fail); }
 }
 
 /* ---------------- responsive ---------------- */
-/* 1200px - four-across form rows get tight before they would wrap badly */
+
 @media (max-width: 1200px) {
   .grid.c4 { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
 
-/* 900px (tablet portrait) - sidebar becomes an off-canvas drawer and the
-   content uses the full width of the screen */
 @media (max-width: 900px) {
   .sidebar {
     position: fixed; z-index: 40; left: 0; top: 0; height: 100dvh;
     width: min(84vw, 300px);
     transform: translateX(-100%); transition: transform .18s;
   }
-  /* the huge spread draws a full-screen scrim without extra markup; a
-     shadow takes no clicks, so tapping the page closes the drawer (app.js) */
+
   .sidebar.open {
     transform: translateX(0);
     box-shadow: 18px 0 40px rgba(0,0,0,.32), 0 0 0 100vmax rgba(6,14,24,.45);
   }
   .hamburger { display: inline-flex; }
-  #btn-collapse { display: none; }          /* collapsing is a desktop-only idea */
+  #btn-collapse { display: none; }
   .main { padding: 14px 14px 48px; }
   .grid.c3, .grid.c4 { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  /* CCRIS / income tables keep readable columns and scroll inside .tbl-wrap
-     instead of squeezing twelve columns into a phone-width card */
+
   .tbl-wrap table.tbl { min-width: 760px; }
   .combined-banner .cb-person { gap: 10px 18px; }
 }
 
-/* 560px (phones) - one column, compact chrome */
 @media (max-width: 560px) {
   .grid.c2, .grid.c3, .grid.c4 { grid-template-columns: 1fr; }
   .main { padding: 10px 10px 40px; }

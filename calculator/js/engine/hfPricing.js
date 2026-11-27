@@ -1,15 +1,11 @@
-/* ============================================================
-   hfPricing.js - HF product/pricing quotation sub-calculators
-   Source: 02_Financing_Calculator_V10.txt sections 3-6
-   (quotation only - instalment / selling price / MOF, no DSR)
-   ============================================================ */
+/* ---------------- hf pricing ---------------- */
+
 (function () {
   'use strict';
   window.Engine = window.Engine || {};
 
   function num(v) { var n = parseFloat(String(v == null ? '' : v).replace(/[,\s%]/g, '')); return isFinite(n) ? n : 0; }
 
-  /** Property Fin (Structured Rate) - 02 section 3. Rates as fractions. */
   function hfStructured(i) {
     var property = num(i.propertyValue), financing = num(i.financing);
     var mrtt = num(i.mrtt), valuation = num(i.valuation), legal = num(i.legal);
@@ -35,13 +31,12 @@
     };
   }
 
-  /** Property Fin (Fixed Rate) - 02 section 4. */
   function hfFixed(i) {
     var property = num(i.propertyValue), financing = num(i.financing);
     var mrtt = num(i.mrtt), valuation = num(i.valuation), legal = num(i.legal);
     var tenure = num(i.tenureYears), rate = num(i.rate);
 
-    var entry = mrtt + valuation + legal;               // D21 = D15+D17+D19
+    var entry = mrtt + valuation + legal;
     var totalFin = financing + entry;
     var entryRatio = property > 0 ? entry / property : 0;
 
@@ -59,7 +54,6 @@
     };
   }
 
-  /** Property Fin (PUC - under construction, grace period) - 02 section 5. */
   function hfPUC(i) {
     var property = num(i.propertyValue), financing = num(i.financing);
     var mrtt = num(i.mrtt), valuation = num(i.valuation), legal = num(i.legal);
@@ -71,12 +65,11 @@
     var effRate = base + spread;
     var mrttFecRatio = property > 0 ? (mrtt + fec) / property : 0;
 
-    // D42: profit accrued during grace + total amortised payments after
     var sellingWithGrace = Math.round(
       (ceiling * totalFin * grace)
       + Engine.PMT(ceiling / 12, tenure * 12, -totalFin) * tenure * 12
     );
-    // D52: grace-period monthly profit = (rate*TotalFin*factor)/(factor*12)
+
     var graceMonthlyCeiling = grace > 0 ? (ceiling * totalFin) / 12 : 0;
     var graceMonthlyEffective = grace > 0 ? (effRate * totalFin) / 12 : 0;
 
@@ -95,24 +88,6 @@
     };
   }
 
-  /**
-   * Home One Account - two parallel term financings.
-   * Mirrors the V10 "Home One Account" sheet columns D (Term 1), F (Term 2)
-   * and H (Total). SBR and Ceiling Rate are shared (Excel F46='=D46',
-   * F40='=D40'); Original Financing, Renovation+Education, MRTT, Valuation,
-   * Legal, Tenure and Spread are per term.
-   *   FEC (g)           = Valuation + Legal
-   *   Total Financing(i)= Financing + Renovation + MRTT + FEC   (Excel D30)
-   *   Original HF MOF(j)= (Financing + Renovation) / Property    (D32)
-   *   FEC MOF (k)       = FEC / Property                         (D34)
-   *   MRTT MOF (l)      = (MRTT + FEC) / Property                (D36)
-   *   Total MOF (m)     = Total Financing / Property             (D38)
-   *   Effective Rate(s) = SBR + Spread                           (D50)
-   *   Selling Price (o) = ROUND(PMT(ceiling/12, yrs*12, -total)*yrs*12, 0)
-   *   Instalment@Ceil(p)= ROUND(PMT(ceiling/12, yrs*12, -total), 0)
-   *   Instalment@Eff (t)= ROUND(PMT(eff/12,     yrs*12, -total), 0)
-   * i: { propertyValue, sbr, ceiling (fractions), t1, t2 }
-   */
   function hfHomeOneTerm(t, property, sbr, ceiling) {
     var financing = num(t.financing), renovation = num(t.renovation);
     var mrtt = num(t.mrtt), valuation = num(t.valuation), legal = num(t.legal);
@@ -153,18 +128,18 @@
       totalFinancing: totalFin,
       origMOF: property > 0 ? totalOrig / property : 0,
       fecMOF: property > 0 ? totalFec / property : 0,
-      mrttMOF: property > 0 ? (totalMrtt + totalFec) / property : 0,   // H36
+      mrttMOF: property > 0 ? (totalMrtt + totalFec) / property : 0,
       totalMOF: property > 0 ? totalFin / property : 0,
       sellingPriceCeiling: t1.sellingPriceCeiling + t2.sellingPriceCeiling,
       instalmentCeiling: t1.instalmentCeiling + t2.instalmentCeiling,
       instalmentEffective: t1.instalmentEffective + t2.instalmentEffective
     };
-    // D75 blended rate = weighted by each term's total financing
+
     var blendedRate = totalFin > 0
       ? t1.effectiveRate * (t1.totalFinancing / totalFin)
         + t2.effectiveRate * (t2.totalFinancing / totalFin)
       : 0;
-    var mrttFecRatio = totals.mrttMOF;    // Excel note keys off H36
+    var mrttFecRatio = totals.mrttMOF;
     return {
       property: property, sbr: sbr, ceiling: ceiling,
       t1: t1, t2: t2, totals: totals,

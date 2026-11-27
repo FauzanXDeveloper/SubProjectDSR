@@ -1,18 +1,12 @@
-/* ============================================================
-   products/cc/cc.js - Credit Card (CC).
-   Formulas, card screen and registration for CC live in this folder.
-   To remove CC: delete this folder and its line in js/products.js.
-   ============================================================ */
+/* ---------------- credit card ---------------- */
+
 (function () {
   'use strict';
   var App = window.App = window.App || {};
   var E = window.Engine;
   var fmt = App.mod.ui.fmt, fmtPct = App.mod.ui.fmtPct, DSR_DP = App.mod.ui.DSR_DP, num = App.mod.ui.num, esc = App.mod.ui.esc, el = App.mod.ui.el, vClass = App.mod.ui.vClass, vLabel = App.mod.ui.vLabel, tile = App.mod.ui.tile, gauge = App.mod.ui.gauge, field = App.mod.ui.field, bindNum = App.mod.ui.bindNum, cardShell = App.mod.ui.cardShell;
   var applicantPersonalIncome = App.mod.applicants.applicantPersonalIncome, applicantIScore = App.mod.applicants.applicantIScore, applicantExisting = App.mod.applicants.applicantExisting, applicantName = App.mod.applicants.applicantName, hfApplicantList = App.mod.applicants.hfApplicantList;
-  /* ============================================================
-     CREDIT CARD (CC) - credit_card.txt sections 3 & 5
-     ============================================================ */
-  // Card image(s) for a product. BOTH shows Platinum + Signature side by side.
+
   function cardImagesHtml(product) {
     var imgs = product === 'BOTH'
       ? [['visa_platinum_cc.svg', 'Visa Platinum'], ['visa_signature_cc.svg', 'Visa Signature']]
@@ -34,7 +28,6 @@
   App.renderCC = function () {
     var cc = App.state.cc;
 
-    // ---- HF + CC: one card application per applicant (multi-card) ----
     if (App.mode === 'hf-cc') {
       ensureCardSeed();
       var appList = hfApplicantList();
@@ -70,7 +63,6 @@
       return;
     }
 
-    // ---- CC standalone / PF + CC: single card, product from Step A ----
     var body =
       cardImagesHtml(cc.product) +
       '<div class="grid c2">' +
@@ -86,7 +78,6 @@
     if (up) up.onchange = function () { App.state.cc.useProposed = this.value === '1'; App.refreshOutputs(); };
   };
 
-  /** Delegated bindings for the HF+CC card list (bound once on the panel). */
   function bindCCList() {
     var panel = el('panel-cc');
     if (!panel) return;
@@ -121,7 +112,6 @@
     }
   }
 
-  /** Pure CC computation - reused by combos. */
   App.computeCC = function () {
     var s = App.state, c = App.computed;
     var original = E.calculateMaxCreditLimit(c.grossIncome, s.iScore, s.cc.product);
@@ -132,7 +122,8 @@
     }
     var threshold = E.ccDsrThreshold(c.grossIncome) / 100;
 
-    function evaluate(baseCommitment) {
+    /* ---------------- scoring ---------------- */
+function evaluate(baseCommitment) {
       var newCommitment = baseCommitment + active.monthlyInstallment;
       var dsr = c.netIncome > 0 ? newCommitment / c.netIncome : 0;
       return {
@@ -151,8 +142,6 @@
     };
   };
 
-  /** One credit-card application (HF+CC multi-card) scored on ITS applicant's
-      personal income, iScore and own existing commitments - never combined. */
   App.computeCCCard = function (card) {
     var pers = applicantPersonalIncome(card.applicant);
     var iScore = applicantIScore(card.applicant);
@@ -177,15 +166,12 @@
     };
   };
 
-  /** Applicants that can still receive a card (one application per person). */
   App.availableCardApplicants = function () {
     var used = {};
     (App.state.cc.cards || []).forEach(function (c) { used[c.applicant] = true; });
     return hfApplicantList().filter(function (a) { return !used[a.key]; });
   };
 
-  /** Ensure the HF+CC card list is seeded (first card = main applicant,
-      carrying whatever Step-A product was previously chosen). */
   function ensureCardSeed() {
     var cc = App.state.cc;
     if (!cc.cards) cc.cards = [];
@@ -193,18 +179,18 @@
       cc.cards.push({ applicant: 'MAIN', product: cc.product || 'VISA_PLATINUM',
         proposedLimit: cc.proposedLimit || '', useProposed: !!cc.useProposed });
     }
-    // drop cards whose applicant is no longer an enabled HF applicant
+
     var valid = {}; hfApplicantList().forEach(function (a) { valid[a.key] = true; });
     cc.cards = cc.cards.filter(function (c) { return valid[c.applicant]; });
     if (!cc.cards.length) cc.cards.push({ applicant: 'MAIN', product: 'VISA_PLATINUM', proposedLimit: '', useProposed: false });
   }
 
-  /** Render one card application's result block (HF+CC per-applicant). */
-  function ccCardResultHtml(rc) {
+  /* ---------------- card result ---------------- */
+function ccCardResultHtml(rc) {
     var a = rc.active;
     var rg = E.cardRiskGrade(rc.iScore);
-    var rgLabel = rg ? rg + ' (iScore ' + rc.iScore + ')'
-      : (rc.iScore ? 'Below RG5 - rejected (iScore ' +rc.iScore + ')' : 'iScore missing');
+    var rgLabel = rg ? rg
+      : (rc.iScore ? 'Below RG5' : '-');
     return '<div class="subhead">' + esc(rc.name) + ' - result' + (rc.card && rc.card.useProposed ? ' (proposed limit)' : '') + '</div>' +
       '<p><span class="verdict ' + vClass(rc.verdict) + '">' + vLabel(rc.verdict) + '</span>&nbsp;&nbsp;' +
       '<span class="verdict ' + (rc.dsr <= rc.threshold && rc.dsr > 0 ? 'ok' : 'fail') + '">DSR ' + fmtPct(rc.dsr, DSR_DP) + '</span></p>' +
@@ -221,7 +207,7 @@
   }
 
   App.refreshCC = function () {
-    // HF+CC: one result block per card application
+
     if (App.mode === 'hf-cc') {
       (App.state.cc.cards || []).forEach(function (card, i) {
         var cell = el('cc-out-' + i);
@@ -233,24 +219,26 @@
     if (!out) return;
     var r = App.computeCC();
     var a = r.active;
-    // Credit-card Risk Grade (distinct from the PF/iScore grade)
+
     var cardRG = E.cardRiskGrade(App.state.iScore);
     var rgLabel = cardRG
-      ? cardRG + ' (iScore ' + App.state.iScore + ')'
-      : (App.state.iScore ? 'Below RG5 - rejected (iScore ' +App.state.iScore + ')' : '-');
+      ? cardRG
+      : (App.state.iScore ? 'Below RG5' : '-');
     out.innerHTML =
-      '<div class="subhead">Result' + (App.state.cc.useProposed ? ' (proposed limit)' : '') + '</div>' +
-      // Standalone: decision shown once, in the Application Summary below.
-      '<p>' + (App.mode === 'cc' ? '' : '<span class="verdict ' + vClass(r.verdict) + '">' + vLabel(r.verdict) + '</span>&nbsp;&nbsp;') +
+      '<div class="result-card">' +
+      '<div class="rc-head"><span class="rc-title">Result' + (App.state.cc.useProposed ? ' (proposed limit)' : '') + '</span>' +
+
+      '<span>' + (App.mode === 'cc' ? '' : '<span class="verdict ' + vClass(r.verdict) + '">' + vLabel(r.verdict) + '</span>&nbsp;&nbsp;') +
       '<span class="verdict ' + (r.afterBT.dsr <= r.threshold && r.afterBT.dsr > 0 ? 'ok' : 'fail') +
-      '">DSR ' + fmtPct(r.afterBT.dsr, DSR_DP) + '</span></p>' +
+      '">DSR ' + fmtPct(r.afterBT.dsr, DSR_DP) + '</span></span></div>' +
       gauge(r.afterBT.dsr, r.threshold) +
       '<div class="tile-grid" style="margin-top:10px">' +
       tile('Credit Card Risk Grade', rgLabel, 'accent') +
       tile('Max Credit Limit', fmt(a.maxCreditLimit), 'accent') +
       tile('Card Monthly Instalment (1%)', fmt(a.monthlyInstallment)) +
-      '</div>' +
-      '<div class="subhead">Before vs After Balance Transfer</div>' +
+      '</div></div>' +
+      '<div class="result-card">' +
+      '<div class="rc-head"><span class="rc-title">Before vs After Balance Transfer</span></div>' +
       '<div class="tile-grid">' +
       tile('New Commitment (before BT)', fmt(r.beforeBT.newCommitment)) +
       tile('New DSR (before BT)', fmtPct(r.beforeBT.dsr, DSR_DP)) +
@@ -258,7 +246,7 @@
       tile('New Commitment (after BT)', fmt(r.afterBT.newCommitment)) +
       tile('New DSR (after BT)', fmtPct(r.afterBT.dsr, DSR_DP)) +
       tile('NDI (after BT)', fmt(r.afterBT.ndi), r.afterBT.ndi > 0 ? 'good' : 'accent') +
-      '</div>';
+      '</div></div>';
   };
 
   App.registerProduct({
