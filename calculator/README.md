@@ -71,3 +71,27 @@ css/, public/, vendor/  styles, logos and card images, pdf.js
 
 - Passwords in `data/users.js` are plain text. Anyone who can open the folder can read them.
 - Exported case files contain customer data (name, IC, CCRIS, income). Store and share them the way you would any customer document.
+
+## Application form formats
+
+Two templates reach the calculator:
+
+- **Digital (2025 / vTB / Dec2025)** - a text PDF from the online application.
+  Step A reads it directly: name, IC, employment, dependants, company postcode,
+  financing amount and tenure.
+- **ERG/08/2026** - usually a scan with no text layer. The browser cannot read
+  it and Step A says so. Either key the fields in manually, or run the OCR
+  helper and import the generated case file:
+
+  ```
+  pip install pymupdf rapidocr-onnxruntime
+  python tools/ocr_appform.py --pdf "1.FORM.pdf" --out case.json
+  ```
+
+  Then use **Import case** in the calculator.
+
+OCR reads the name, NRIC, dependants, company postcode/town/state, financing
+amount and tenure. Tick boxes cannot be OCR-read, so Nature of Employment is
+always selected manually. Town and state are taken from the postcode table
+(`data/geo/myPostcodes.js`), which is also what decides the Urban / Sub-Urban
+workplace bucket.
