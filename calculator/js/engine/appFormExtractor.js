@@ -181,6 +181,15 @@
     return { value: '', index: -1 };
   }
 
+  /* First label variant that returns a value (digital vs ERG template). */
+  function firstField(rows, regexes, options) {
+    for (var i = 0; i < regexes.length; i++) {
+      var spec = field(rows, regexes[i], options);
+      if (spec.value) return spec;
+    }
+    return { value: '', index: -1 };
+  }
+
   /* Rows between two section headers. */
   function section(rows, startRe, endRe) {
     var start = -1;
@@ -232,11 +241,18 @@
     };
 
     if (!rows.length) {
-      result.warnings.push('The PDF has no readable text - it may be a scan.');
+      result.warnings.push('The PDF has no readable text - it is a scan. ' +
+        'Use the digital form, or run tools/ocr_appform.py and import the case file.');
       return result;
     }
 
     var all = rows.map(rowText).join('\n');
+    if (all.replace(/\s+/g, '').length < 200) {
+      result.warnings.push('This PDF is a scanned image with no text layer. The older ' +
+        'ERG/08/2026 form is usually a scan - use the digital form, run ' +
+        'tools/ocr_appform.py and import the case file, or key the fields in manually.');
+      return result;
+    }
     if (!/Personal Financing-i Application|Financing Details/i.test(all)) {
       result.warnings.push('This PDF does not look like a Personal Financing-i application form.');
       return result;
@@ -246,9 +262,15 @@
       return Math.max(max, row.page || 1);
     }, 1);
 
-    var applicant = section(rows, /^\s*1\.\s*Applicant/i, /^\s*2\.\s*/);
-    var employment = section(rows, /^\s*4\.\s*Applicant/i, /^\s*5\.\s*/);
-    var financing = section(rows, /Financing Details/i, /For Office Use Only|Sales Person Information/i);
+    var applicant = section(rows,
+      /^\s*1\.\s*Applicant|APPLICANT'?S INFORMATION/i,
+      /^\s*2\.\s*|APPLICANT'?S HOME ADDRESS/i);
+    var employment = section(rows,
+      /^\s*4\.\s*Applicant|APPLICANT'?S CURRENT EMPLOYMENT/i,
+      /^\s*5\.\s*|APPLICANT'?S PREVIOUS EMPLOYMENT/i);
+    var financing = section(rows, /Financing Details|FINANCING PURPOSE/i,
+      /For Office Use Only|Sales Person Information|APPLICANT'?S INFORMATION/i);
+    var moneyScope = financing.length ? financing : rows;
 
     function put(key, spec) {
       var value = spec && spec.value ? clean(spec.value) : '';
@@ -259,7 +281,10 @@
 
     /* Identity - the page header carries name and IC on every page. */
     put('name', field(rows, /^Full Name\s*:?/i));
-    put('ic', field(rows, /^IC Number\s*:?/i));
+    put('ic', firstField(rows, [
+      /^IC Number\s*:?/i,
+      /^New NRIC No\.?\s*\/?\s*Passport No\.?\s*:?/i
+    ]));
 
     /* Section 1 - applicant */
     put('dependants', field(applicant, /^No\. of Dependants\s*:?/i));
@@ -279,10 +304,13 @@
     put('country', field(employment, /^Country\s*:?/i));
 
     /* Financing details */
-    put('financingAmount', field(financing, /^Financing Amount\s*:?/i));
-    put('tenureMonths', field(financing, /^Tenure of Financing\s*:?/i));
-    put('monthlyIncome', field(financing, /^Monthly Income\s*:?/i));
-    put('purpose', field(financing, /^Purpose of Financing\s*:?/i, {
+    put('financingAmount', firstField(moneyScope, [
+      /^Financing Amount\s*:?/i,
+      /^Financing Limit Requested\s*:?/i
+    ]));
+    put('tenureMonths', firstField(moneyScope, [/^Tenure of Financing\s*:?/i]));
+    put('monthlyIncome', field(moneyScope, /^Monthly Income\s*:?/i));
+    put('purpose', field(moneyScope, /^Purpose of Financing\s*:?/i, {
       maxLines: 2, stopRe: /^For Office Use Only/i
     }));
 
