@@ -17,7 +17,20 @@
 
       gate: { minIncome: 3000, autoOk: 5000 },
 
-      gradeMax: { 4: 20000, 5: 30000, 6: 30000, 7: 40000, 8: 40000, 9: 50000, 10: 50000 }
+      gradeMax: { 4: 20000, 5: 30000, 6: 30000, 7: 40000, 8: 40000, 9: 50000, 10: 50000 },
+
+      /* NDI enhancement (v2) - additive. Does not change the rules above. */
+      ndiV2: {
+        increment: { urban: 0.0468, suburban: 0.0374 },
+        cost: {
+          urban: { base: 0.0749, h2: 0.4332, h3: 0.6659, h4: 0.7971 },
+          suburban: { base: 0.0755, h2: 0.3404, h3: 0.4870, h4: 0.6316 }
+        },
+        onMissing: 'none'
+      },
+
+      /* PF Aggregated = existing PF commitments + new PF, without BT netting. */
+      aggregate: { facilities: ['PELNFNCE', 'PELNFNSA'] }
     },
 
     hf: {
